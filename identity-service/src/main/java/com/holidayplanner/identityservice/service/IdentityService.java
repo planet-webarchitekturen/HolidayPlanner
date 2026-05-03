@@ -3,6 +3,8 @@ package com.holidayplanner.identityservice.service;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
+import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
+import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
 import com.holidayplanner.identityservice.repository.UserRepository;
@@ -22,6 +24,7 @@ public class IdentityService {
     private final FamilyMemberRepository familyMemberRepository;
     private final CaregiverRepository caregiverRepository;
     private final PasswordEncoder passwordEncoder;
+    private final IdentityEventProducer identityEventProducer;
 
     // --- User Operations ---
 
@@ -37,7 +40,18 @@ public class IdentityService {
         user.setPhoneNumber(phoneNumber);
         user.setOrganizationId(organizationId);
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+
+        UserRegisteredPayload payload = new UserRegisteredPayload(
+                saved.getId(),
+                saved.getEmail(),
+                saved.getPhoneNumber(),
+                saved.getOrganizationId(),
+                saved.getRole()
+        );
+        identityEventProducer.publishUserRegistered(payload);
+
+        return saved;
     }
 
     public User updatePhoneNumber(UUID userId, String phoneNumber) {
