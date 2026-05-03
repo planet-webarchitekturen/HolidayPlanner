@@ -94,3 +94,29 @@ This is application-level CQRS. Reads and writes still use the same PostgreSQL d
 
 4. **Is code-level CQRS enough for the assignment?**
    For this project, splitting command and query services is likely sufficient. A stricter CQRS version would add a separate read model or projection database for organization dashboards.
+
+---
+
+## Section 4: Kafka Integration
+
+To align organization-service with the rest of the project, Kafka was added in the same implementation style as booking-service, event-service, and payment-service.
+
+### Produced Event
+
+**Topic:** `holiday-planner.organization.created`
+
+Published by `OrganizationCommandService` after a new organization is persisted.
+
+Payload:
+- `organizationId`
+- `name`
+- `bankAccount`
+- `bookingStartTime`
+
+### Consumed Event
+
+**Topic:** `holiday-planner.identity.user-registered`
+
+Published by identity-service after a user account is registered. organization-service consumes this event and checks whether the referenced `organizationId` exists locally.
+
+If the organization does not exist, a warning is logged. This is a lightweight but meaningful consumer: it validates cross-service references and provides a place for future onboarding or synchronization logic.

@@ -86,6 +86,10 @@ public class OrganizationQueryService {
         );
     }
 
+    public boolean organizationExists(UUID organizationId) {
+        return organizationRepository.existsById(organizationId);
+    }
+
     private Organization findOrganization(UUID organizationId) {
         return organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new RuntimeException("Organization not found: " + organizationId));

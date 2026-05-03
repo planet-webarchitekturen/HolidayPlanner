@@ -1,8 +1,10 @@
 package com.holidayplanner.organizationservice.command;
 
+import com.holidayplanner.organizationservice.kafka.OrganizationEventProducer;
 import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.organizationservice.repository.SponsorRepository;
 import com.holidayplanner.organizationservice.repository.TeamMemberRepository;
+import com.holidayplanner.shared.kafka.payload.OrganizationCreatedPayload;
 import com.holidayplanner.shared.model.Organization;
 import com.holidayplanner.shared.model.Sponsor;
 import com.holidayplanner.shared.model.TeamMember;
@@ -21,6 +23,7 @@ public class OrganizationCommandService {
     private final OrganizationRepository organizationRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final SponsorRepository sponsorRepository;
+    private final OrganizationEventProducer organizationEventProducer;
 
     public Organization createOrganization(String name, String bankAccount,
                                            LocalDateTime bookingStartTime) {
@@ -31,7 +34,17 @@ public class OrganizationCommandService {
         org.setName(name);
         org.setBankAccount(bankAccount);
         org.setBookingStartTime(bookingStartTime);
-        return organizationRepository.save(org);
+        Organization saved = organizationRepository.save(org);
+
+        OrganizationCreatedPayload payload = new OrganizationCreatedPayload(
+                saved.getId(),
+                saved.getName(),
+                saved.getBankAccount(),
+                saved.getBookingStartTime() != null ? saved.getBookingStartTime().toString() : null
+        );
+        organizationEventProducer.publishOrganizationCreated(payload);
+
+        return saved;
     }
 
     public Organization updateOrganization(UUID organizationId, String bankAccount,
