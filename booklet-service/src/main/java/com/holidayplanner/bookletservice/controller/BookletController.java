@@ -1,14 +1,17 @@
 package com.holidayplanner.bookletservice.controller;
 
+import com.holidayplanner.bookletservice.exception.UpstreamServiceException;
 import com.holidayplanner.bookletservice.service.BookletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/booklets")
@@ -20,6 +23,19 @@ public class BookletController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("BookletService is running!");
+    }
+
+    @GetMapping("/organizations/{organizationId}")
+    public ResponseEntity<byte[]> generateComposedOrganizationBooklet(
+            @PathVariable("organizationId") UUID organizationId) throws IOException {
+
+        byte[] pdf = bookletService.generateOrganizationBooklet(organizationId);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"booklet-" + organizationId + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // Generate full organization booklet as PDF download
@@ -61,5 +77,10 @@ public class BookletController {
     public static class GenerateBookletRequest {
         private List<String> eventSummaries;
         private List<String> sponsorNames;
+    }
+
+    @ExceptionHandler(UpstreamServiceException.class)
+    public ResponseEntity<String> handleUpstreamServiceException(UpstreamServiceException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(e.getMessage());
     }
 }

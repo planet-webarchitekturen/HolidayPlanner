@@ -4,3 +4,9 @@ spring:
 
 server:
   port: 8087
+
+services:
+  organization-service:
+    url: ${SERVICES_ORGANIZATION_SERVICE_URL:http://localhost:8084}
+  event-service:
+    url: ${SERVICES_EVENT_SERVICE_URL:http://localhost:8081}

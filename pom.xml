@@ -16,6 +16,7 @@
         <module>shared</module>
         <module>booking-service</module>
         <module>booklet-service</module>
+        <module>booklet-request-service</module>
         <module>event-service</module>
         <module>identity-service</module>
         <module>notification-service</module>
