@@ -4,6 +4,7 @@ import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
+import com.holidayplanner.identityservice.config.JwtTokenProvider;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
@@ -25,6 +26,7 @@ public class IdentityService {
     private final CaregiverRepository caregiverRepository;
     private final PasswordEncoder passwordEncoder;
     private final IdentityEventProducer identityEventProducer;
+    private final JwtTokenProvider jwtTokenProvider;
 
     // --- User Operations ---
 
@@ -52,6 +54,22 @@ public class IdentityService {
         identityEventProducer.publishUserRegistered(payload);
 
         return saved;
+    }
+
+    /**
+     * Authenticate user and generate JWT token
+     */
+    public String loginUser(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        // Generate JWT token with user's roles
+        List<String> roles = List.of(user.getRole().toString());
+        return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles);
     }
 
     public User updatePhoneNumber(UUID userId, String phoneNumber) {
