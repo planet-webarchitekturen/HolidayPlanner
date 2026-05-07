@@ -52,6 +52,18 @@ public class IdentityQueryService {
     }
 
     /**
+     * Fetch a user by email.
+     * 
+     * @param email the user's email
+     * @return the User
+     * @throws RuntimeException if user not found
+     */
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+    }
+
+    /**
      * Fetch all family members for a given user.
      * 
      * @param userId the parent/user's ID

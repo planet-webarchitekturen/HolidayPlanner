@@ -82,7 +82,7 @@ public class DomainEventPublisher {
             Message<DomainEvent> message = MessageBuilder
                     .withPayload(event)
                     .setHeader(KafkaHeaders.TOPIC, topic)
-                    .setHeader(KafkaHeaders.MESSAGE_KEY, key)
+                    .setHeader("kafka_messageKey", key)
                     .build();
 
             kafkaTemplate.send(message);

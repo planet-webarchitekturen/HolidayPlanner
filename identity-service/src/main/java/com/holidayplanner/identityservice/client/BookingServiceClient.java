@@ -1,5 +1,6 @@
 package com.holidayplanner.identityservice.client;
 
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@NoArgsConstructor(force = true)
 public class BookingServiceClient {
 
     private final RestClient restClient;
