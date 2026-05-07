@@ -5,23 +5,16 @@ Added JWT-based authentication to the identity service. Users receive a JWT toke
 
 ## Changes Made
 
-### 1. Dependencies
+###  Dependencies
 - Added JJWT 0.12.3 (jjwt-api, jjwt-impl, jjwt-jackson) to `identity-service/pom.xml`
 
-### 2. Core Components
+###  Core Components
 - **JwtTokenProvider**: Generates and validates JWT tokens
 - **JwtAuthenticationFilter**: Extracts JWT from Authorization header and sets SecurityContext
 - **LoginResponse DTO**: Returns user info + token to client
 
-### 3. Endpoints
-| Method | Path | Auth Required | Returns |
-|--------|------|---------------|---------|
-| POST | `/api/auth/register` | No | UserResponse |
-| POST | `/api/auth/login` | No | LoginResponse (with token) |
-| Other | `/api/identity/**` | Yes | — |
 
-### 4. Configuration
-- **Public endpoints**: `/api/identity/health`, `/api/auth/register`, `/api/auth/login`
+### Configuration
 - **Session policy**: STATELESS
 - **JWT secret**: Configurable via `jwt.secret` property (app.yml)
 - **Expiration**: Configurable via `jwt.expiration` property (default: 1 hour)
@@ -42,13 +35,7 @@ Added JWT-based authentication to the identity service. Users receive a JWT toke
 
 **Login Request:**
 ```bash
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
+curl -X POST "http://localhost:8083/api/auth/register?email=test@example.com&password=test123&phoneNumber=+43664123456&organizationId=a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 ```
 
 **Login Response:**
