@@ -7,8 +7,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    # Host:Container — use 5433 on the host if 5432 is already taken (e.g. local Postgres)
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh

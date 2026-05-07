@@ -6,3 +6,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
+
+services:
+  booking-service:
+    url: ${BOOKING_SERVICE_URL:http://booking-service:8082}
+  identity-service:
+    url: ${IDENTITY_SERVICE_URL:http://identity-service:8083}
+  notification-service:
+    url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8086}

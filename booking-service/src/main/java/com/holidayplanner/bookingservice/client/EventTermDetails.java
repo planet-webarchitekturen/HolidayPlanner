@@ -14,7 +14,7 @@ public class EventTermDetails {
     private UUID id;
     private UUID eventId;
     private int maxParticipants;
-    private String status; // DRAFT, ACTIVE, CANCELLED
+    private String status;
     private LocalDateTime startDateTime;
     private LocalDateTime endDateTime;
 }

@@ -25,8 +25,6 @@ public class BookingController {
         return ResponseEntity.ok("BookingService is running!");
     }
 
-    // --- Read endpoints (queries) ---
-
     @GetMapping("/event-term/{eventTermId}")
     public ResponseEntity<List<BookingResponse>> getBookingsForEventTerm(@PathVariable("eventTermId") UUID eventTermId) {
         return ResponseEntity.ok(bookingQueryService.getBookingsForEventTerm(eventTermId));
@@ -51,8 +49,6 @@ public class BookingController {
     public ResponseEntity<List<BookingDetailResponse>> getBookingsForFamilyMemberEnriched(@PathVariable("familyMemberId") UUID familyMemberId) {
         return ResponseEntity.ok(bookingQueryService.getBookingsForFamilyMemberEnriched(familyMemberId));
     }
-
-    // --- Write endpoints (commands) ---
 
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(

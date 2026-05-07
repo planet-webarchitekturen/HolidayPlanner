@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:eventtest;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  kafka:
+    bootstrap-servers: localhost:9092
+  task:
+    scheduling:
+      enabled: false
+
+services:
+  booking-service:
+    url: http://localhost:8082
+  identity-service:
+    url: http://localhost:8083
+  notification-service:
+    url: http://localhost:8086

@@ -25,8 +25,9 @@ Pattern: `holiday-planner.<service>.<event-name>`
 | `holiday-planner.booking.created` | A booking was created (CONFIRMED or WAITLISTED) |
 | `holiday-planner.booking.cancelled` | A booking was cancelled |
 | `holiday-planner.booking.waitlist-promoted` | A waitlisted booking was promoted to CONFIRMED |
-| `holiday-planner.event.term-cancelled` | An event term was cancelled by the event owner |
+| `holiday-planner.event.term-cancelled` | An event term was cancelled (event owner or auto-cancel job) |
 | `holiday-planner.event.participant-list-requested` | Scheduler requests caregiver notification |
+| `holiday-planner.event.capacity-increased` | Max participants increased; booking-service should promote waitlist |
 | `holiday-planner.payment.refunded` | A payment was refunded |
 
 **Why this pattern:**
@@ -91,6 +92,7 @@ Every Kafka message is wrapped in a `KafkaEnvelope<T>`:
 | `holiday-planner.booking.waitlist-promoted` | booking-service | notification-service (emails parent — booking confirmed) |
 | `holiday-planner.event.term-cancelled` | event-service | booking-service (cancels all bookings), notification-service (emails caregivers) |
 | `holiday-planner.event.participant-list-requested` | event-service (scheduler) | notification-service (emails caregiver with participant list) |
+| `holiday-planner.event.capacity-increased` | event-service | booking-service (should call `promoteFromWaitingList` — **consumer to be implemented**) |
 | `holiday-planner.payment.refunded` | payment-service | notification-service (emails parent about refund) |
 
 ---

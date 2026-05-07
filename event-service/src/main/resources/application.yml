@@ -3,7 +3,8 @@ spring:
     name: event-service
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:event_db}
+    # Default 5433 matches docker-compose host mapping (5433:5432). Override DB_PORT=5432 for a local Postgres on 5432.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:event_db}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -18,7 +19,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -29,4 +30,17 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 server:
-  port: 8081
+  port: 8094
+
+services:
+  booking-service:
+    url: ${BOOKING_SERVICE_URL:http://localhost:8082}
+  identity-service:
+    url: ${IDENTITY_SERVICE_URL:http://localhost:8083}
+  notification-service:
+    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+
+event-service:
+  scheduler:
+    auto-cancel-cron: ${EVENT_AUTO_CANCEL_CRON:0 0 3 * * *}
+    day-before-cron: ${EVENT_DAY_BEFORE_CRON:0 15 2 * * *}

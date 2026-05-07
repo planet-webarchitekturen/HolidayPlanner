@@ -32,7 +32,8 @@ Pattern: `{domain}.{entity}.{event}`
 | `booking.booking.cancelled` | booking-service | A booking was cancelled |
 | `booking.booking.promoted` | booking-service | Waitlisted booking moved to confirmed |
 | `event.eventterm.status-changed` | event-service | EventTerm status changed (ACTIVE, CANCELLED…) |
-| `event.eventterm.capacity-updated` | event-service | Max participants changed |
+| `event.eventterm.capacity-updated` | event-service | Max participants changed (legacy name; runtime may use `holiday-planner.event.capacity-increased`) |
+| `event.eventterm.capacity-increased` | event-service | Max participants increased (waitlist promotion signal) |
 | `identity.user.registered` | identity-service | New user account created |
 | `organization.organization.created` | organization-service | New organization registered |
 | `payment.payment.completed` | payment-service | Payment successfully processed |

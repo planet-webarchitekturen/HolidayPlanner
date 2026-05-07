@@ -15,10 +15,10 @@ docker compose up -d
 Wait ~60 seconds, then verify:
 
 ```bash
-curl http://localhost:8081/actuator/health  # event-service
-curl http://localhost:8082/actuator/health  # booking-service
-curl http://localhost:8083/actuator/health  # identity-service
-curl http://localhost:8085/actuator/health  # payment-service
+curl http://localhost:8081/api/events/health   # event-service
+curl http://localhost:8082/api/bookings/health # booking-service
+curl http://localhost:8083/api/identity/health # identity-service
+curl http://localhost:8085/api/payments/health # payment-service
 ```
 
 Kafka UI: http://localhost:5001
@@ -169,6 +169,8 @@ docker compose up
 
 This starts: all 7 services + PostgreSQL + Kafka + Kafka UI (http://localhost:5000).
 
+PostgreSQL is published on **host port 5433** (`5433:5432` in `docker-compose.yml`) so it does not clash with a local Postgres on 5432. From your machine, set `DB_PORT=5433` when connecting to the compose database; containers still use `postgres:5432` on the Docker network.
+
 Images are pulled automatically from GHCR (`ghcr.io/muhiguezel/holidayplanner-*:latest`).
 
 ### Build an image manually (from the repo root)
@@ -258,3 +260,4 @@ See [docs/messaging-conventions.md](docs/messaging-conventions.md) for the full 
 - [System Operations](docs/system-operations.md)
 - [Messaging Conventions](docs/messaging-conventions.md)
 - [Testing Notes](docs/testing-notes.md)
+- [Event Service design](docs/event-service-design.md)
