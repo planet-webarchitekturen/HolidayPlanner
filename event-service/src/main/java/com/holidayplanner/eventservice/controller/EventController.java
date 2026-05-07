@@ -24,6 +24,19 @@ public class EventController {
         return ResponseEntity.ok("EventService is running!");
     }
 
+    @PostMapping
+    public ResponseEntity<Event> createEvent(
+            @RequestParam("organizationId") UUID organizationId,
+            @RequestParam("eventOwnerId") UUID eventOwnerId,
+            @RequestParam("shortTitle") String shortTitle,
+            @RequestParam("description") String description,
+            @RequestParam("location") String location,
+            @RequestParam("minimalAge") int minimalAge,
+            @RequestParam("maximalAge") int maximalAge) {
+        return ResponseEntity.ok(eventManagementService.createEvent(
+                organizationId, eventOwnerId, shortTitle, description, location, minimalAge, maximalAge));
+    }
+
     @GetMapping("/terms/{eventTermId}")
     public ResponseEntity<EventTermResponse> getEventTerm(@PathVariable("eventTermId") UUID eventTermId) {
         EventTerm term = eventManagementService.verifyEventTerm(eventTermId);

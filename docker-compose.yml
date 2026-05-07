@@ -72,6 +72,9 @@ services:
         condition: service_healthy
 
   booking-service:
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
     image: muhiguezel/booking-service:latest
     ports:
       - "8082:8082"
@@ -86,8 +89,12 @@ services:
       DB_NAME: booking_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      SERVICES_EVENT_SERVICE_URL: http://event-service:8081
 
   event-service:
+    build:
+      context: .
+      dockerfile: event-service/Dockerfile
     image: muhiguezel/event-service:latest
     ports:
       - "8081:8081"
@@ -104,6 +111,9 @@ services:
       DB_PASSWORD: postgres
 
   identity-service:
+    build:
+      context: .
+      dockerfile: identity-service/Dockerfile
     image: muhiguezel/identity-service:latest
     ports:
       - "8083:8083"
@@ -117,6 +127,9 @@ services:
       DB_PASSWORD: postgres
 
   organization-service:
+    build:
+      context: .
+      dockerfile: organization-service/Dockerfile
     image: muhiguezel/organization-service:latest
     ports:
       - "8084:8084"
@@ -130,6 +143,9 @@ services:
       DB_PASSWORD: postgres
 
   payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
     image: muhiguezel/payment-service:latest
     ports:
       - "8085:8085"
@@ -146,6 +162,9 @@ services:
       DB_PASSWORD: postgres
 
   notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
     image: muhiguezel/notification-service:latest
     ports:
       - "8090:8089"
@@ -160,6 +179,9 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-your-password}
 
   booklet-service:
+    build:
+      context: .
+      dockerfile: booklet-service/Dockerfile
     image: muhiguezel/booklet-service:latest
     ports:
       - "8087:8087"
