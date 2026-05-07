@@ -3,7 +3,7 @@ package com.holidayplanner.paymentservice.kafka;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.paymentservice.repository.PaymentRepository;
-import com.holidayplanner.paymentservice.service.PaymentService;
+import com.holidayplanner.paymentservice.command.PaymentCommandService;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class BookingCreatedConsumer {
 
-    private final PaymentService paymentService;
+    private final PaymentCommandService paymentCommandService;
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
 
@@ -38,7 +38,7 @@ public class BookingCreatedConsumer {
                 return;
             }
 
-            paymentService.createPayment(payload.getBookingId(), payload.getOrganizationId(), payload.getAmount());
+            paymentCommandService.createPayment(payload.getBookingId(), payload.getOrganizationId(), payload.getAmount());
             log.info("Created payment for booking {}", payload.getBookingId());
         } catch (Exception e) {
             log.error("Failed to process BookingCreated event: {}", e.getMessage());

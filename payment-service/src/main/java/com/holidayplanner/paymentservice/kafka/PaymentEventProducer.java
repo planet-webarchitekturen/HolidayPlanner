@@ -25,8 +25,8 @@ public class PaymentEventProducer {
                     LocalDateTime.now().toString(),
                     "payment-service", payload);
             String json = objectMapper.writeValueAsString(envelope);
-            kafkaTemplate.send("holiday-planner.payment.refunded",
-                    payload.getPaymentId().toString(), json);
+            String key = payload.getPaymentId().toString();
+            kafkaTemplate.send("holiday-planner.payment.refunded", key, json);
         } catch (Exception e) {
             log.error("Failed to publish PaymentRefunded event", e);
         }
