@@ -88,6 +88,11 @@ public class EventController {
 
     // --- Event terms (queries) ---
 
+    @GetMapping("/{eventId}/terms")
+    public ResponseEntity<List<EventTermResponse>> getTermsForEvent(@PathVariable("eventId") UUID eventId) {
+        return ResponseEntity.ok(eventTermQueryService.getTermsForEvent(eventId));
+    }
+
     @GetMapping("/terms/{eventTermId}")
     public ResponseEntity<EventTermResponse> getEventTerm(@PathVariable("eventTermId") UUID eventTermId) {
         return ResponseEntity.ok(eventTermQueryService.getEventTerm(eventTermId));

@@ -26,6 +26,12 @@ public class EventTermQueryService {
         return EventTermResponse.from(term);
     }
 
+    public List<EventTermResponse> getTermsForEvent(UUID eventId) {
+        return eventTermRepository.findByEvent_Id(eventId).stream()
+                .map(EventTermResponse::from)
+                .toList();
+    }
+
     public List<EventTerm> findActiveTermsStartingWithin24Hours(LocalDateTime now) {
         return eventTermRepository.findActiveTermsStartingInWindow(now, now.plusHours(24));
     }
