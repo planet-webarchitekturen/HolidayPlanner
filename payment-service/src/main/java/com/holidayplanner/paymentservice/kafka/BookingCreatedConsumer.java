@@ -38,7 +38,8 @@ public class BookingCreatedConsumer {
                 return;
             }
 
-            paymentCommandService.createPayment(payload.getBookingId(), payload.getOrganizationId(), payload.getAmount());
+            paymentCommandService.createPayment(payload.getBookingId(), payload.getOrganizationId(), payload.getAmount(),
+                    payload.getParentEmail(), payload.getEventName());
             log.info("Created payment for booking {}", payload.getBookingId());
         } catch (Exception e) {
             log.error("Failed to process BookingCreated event: {}", e.getMessage());

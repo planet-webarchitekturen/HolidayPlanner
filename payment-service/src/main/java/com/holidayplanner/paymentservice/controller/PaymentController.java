@@ -33,11 +33,14 @@ public class PaymentController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ACCOUNTANT', 'ORGANIZATION_OWNER')")
     public ResponseEntity<Payment> createPayment(
             @RequestParam("bookingId") UUID bookingId,
             @RequestParam("organizationId") UUID organizationId,
-            @RequestParam("amount") BigDecimal amount) {
-        return ResponseEntity.ok(paymentCommandService.createPayment(bookingId, organizationId, amount));
+            @RequestParam("amount") BigDecimal amount,
+            @RequestParam(value = "parentEmail", required = false) String parentEmail,
+            @RequestParam(value = "eventName", required = false) String eventName) {
+        return ResponseEntity.ok(paymentCommandService.createPayment(bookingId, organizationId, amount, parentEmail, eventName));
     }
 
     @GetMapping("/organization/{organizationId}")

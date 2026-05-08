@@ -26,7 +26,7 @@ public class EventTermCancelledConsumer {
                     new TypeReference<KafkaEnvelope<EventTermCancelledPayload>>() {});
             EventTermCancelledPayload payload = envelope.getPayload();
             notificationService.notifyCaregiversOfAutoCancellation(
-                    payload.getCaregiverIds(),
+                    payload.getCaregiverEmails(),
                     payload.getEventName(),
                     payload.getTermDate());
         } catch (Exception e) {

@@ -20,7 +20,7 @@ public class PaymentService {
     private final PaymentQueryService paymentQueryService;
 
     public Payment createPayment(UUID bookingId, UUID organizationId, BigDecimal amount) {
-        return paymentCommandService.createPayment(bookingId, organizationId, amount);
+        return paymentCommandService.createPayment(bookingId, organizationId, amount, null, null);
     }
 
     public Payment markAsPaid(UUID paymentId, String note) {

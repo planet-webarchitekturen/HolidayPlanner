@@ -100,4 +100,10 @@ public class IdentityQueryService {
                 .orElseThrow(() -> new RuntimeException("Family member not found: " + familyMemberId));
         return fm.getUser().getEmail();
     }
+
+    public String getFamilyMemberDisplayName(UUID familyMemberId) {
+        FamilyMember fm = familyMemberRepository.findById(familyMemberId)
+                .orElseThrow(() -> new RuntimeException("Family member not found: " + familyMemberId));
+        return fm.getFirstName() + " " + fm.getLastName();
+    }
 }

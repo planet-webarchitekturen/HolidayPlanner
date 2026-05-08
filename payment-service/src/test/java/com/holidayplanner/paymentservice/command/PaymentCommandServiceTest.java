@@ -41,7 +41,7 @@ class PaymentCommandServiceTest {
 
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment payment = paymentCommandService.createPayment(bookingId, organizationId, amount);
+        Payment payment = paymentCommandService.createPayment(bookingId, organizationId, amount, null, null);
 
         assertEquals(bookingId, payment.getBookingId());
         assertEquals(organizationId, payment.getOrganizationId());

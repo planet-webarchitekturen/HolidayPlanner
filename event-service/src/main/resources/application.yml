@@ -44,7 +44,7 @@ services:
   identity-service:
     url: ${IDENTITY_SERVICE_URL:http://localhost:8083}
   notification-service:
-    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8089}
 
 event-service:
   scheduler:

@@ -45,6 +45,10 @@ public class Payment {
     // Optional note from accountant
     private String note;
 
+    // Denormalized for notifications — populated from BookingCreated event
+    private String parentEmail;
+    private String eventName;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

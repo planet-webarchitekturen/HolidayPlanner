@@ -23,12 +23,15 @@ public class PaymentCommandService {
     private final PaymentEventProducer paymentEventProducer;
 
     @Transactional
-    public Payment createPayment(UUID bookingId, UUID organizationId, BigDecimal amount) {
+    public Payment createPayment(UUID bookingId, UUID organizationId, BigDecimal amount,
+            String parentEmail, String eventName) {
         Payment payment = new Payment();
         payment.setBookingId(bookingId);
         payment.setOrganizationId(organizationId);
         payment.setAmount(amount);
         payment.setStatus(PaymentStatus.PENDING);
+        payment.setParentEmail(parentEmail);
+        payment.setEventName(eventName);
         return paymentRepository.save(payment);
     }
 
@@ -69,8 +72,8 @@ public class PaymentCommandService {
                 saved.getId(),
                 saved.getBookingId(),
                 saved.getOrganizationId(),
-                null,
-                null,
+                saved.getParentEmail(),
+                saved.getEventName(),
                 saved.getAmount());
         paymentEventProducer.publishPaymentRefunded(payload);
 

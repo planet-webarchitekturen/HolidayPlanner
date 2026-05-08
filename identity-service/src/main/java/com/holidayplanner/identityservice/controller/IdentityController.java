@@ -123,6 +123,13 @@ public class IdentityController {
         return ResponseEntity.ok(java.util.Map.of("email", email));
     }
 
+    @GetMapping("/api/identity/family-members/{memberId}/display-name")
+    public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
+            @PathVariable("memberId") UUID memberId) {
+        String name = queryService.getFamilyMemberDisplayName(memberId);
+        return ResponseEntity.ok(java.util.Map.of("name", name));
+    }
+
     @DeleteMapping("/api/identity/family-members/{memberId}")
     public ResponseEntity<Void> removeFamilyMember(@PathVariable("memberId") UUID memberId) {
         commandService.removeFamilyMember(memberId);

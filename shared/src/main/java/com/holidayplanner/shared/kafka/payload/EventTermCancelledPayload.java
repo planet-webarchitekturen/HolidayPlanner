@@ -15,6 +15,6 @@ public class EventTermCancelledPayload {
     private String eventName;
     private String termDate;
     private UUID organizationId;
-    private List<String> caregiverIds;
+    private List<String> caregiverEmails;
     private String cancelledBy;
 }

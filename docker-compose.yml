@@ -130,6 +130,7 @@ services:
       DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
+      NOTIFICATION_SERVICE_URL: http://notification-service:8089
 
   identity-service:
     build:
@@ -147,6 +148,7 @@ services:
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: identity_db
       DB_USER: postgres
       DB_PASSWORD: postgres

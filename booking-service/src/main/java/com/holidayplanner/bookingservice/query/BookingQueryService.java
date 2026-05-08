@@ -1,6 +1,7 @@
 package com.holidayplanner.bookingservice.query;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
+import com.holidayplanner.bookingservice.client.IdentityServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingDetailResponse;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
@@ -23,6 +24,7 @@ public class BookingQueryService {
 
     private final BookingRepository bookingRepository;
     private final EventServiceClient eventServiceClient;
+    private final IdentityServiceClient identityServiceClient;
 
     public List<BookingResponse> getBookingsForEventTerm(UUID eventTermId) {
         return bookingRepository.findByEventTermId(eventTermId).stream()
@@ -77,5 +79,20 @@ public class BookingQueryService {
         }
 
         return summary;
+    }
+
+    public List<String> getParticipantParentEmails(UUID eventTermId) {
+        return bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED).stream()
+                .map(b -> identityServiceClient.getOwnerEmail(b.getFamilyMemberId()))
+                .filter(email -> email != null)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    public List<String> getParticipantDisplayNames(UUID eventTermId) {
+        return bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED).stream()
+                .map(b -> identityServiceClient.getFamilyMemberDisplayName(b.getFamilyMemberId()))
+                .filter(name -> name != null)
+                .collect(Collectors.toList());
     }
 }

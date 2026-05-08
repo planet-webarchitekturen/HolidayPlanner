@@ -26,7 +26,15 @@ public class IdentityServiceClient {
     }
 
     public String getOwnerEmail(UUID familyMemberId) {
-        String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId + "/owner-email";
+        return fetchStringField(familyMemberId, "owner-email", "email", "owner email");
+    }
+
+    public String getFamilyMemberDisplayName(UUID familyMemberId) {
+        return fetchStringField(familyMemberId, "display-name", "name", "display name");
+    }
+
+    private String fetchStringField(UUID familyMemberId, String endpoint, String field, String label) {
+        String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId + "/" + endpoint;
         try {
             @SuppressWarnings("unchecked")
             Map<String, String> response = restClient.get()
@@ -37,9 +45,9 @@ public class IdentityServiceClient {
                     })
                     .retrieve()
                     .body(Map.class);
-            return response != null ? response.get("email") : null;
+            return response != null ? response.get(field) : null;
         } catch (Exception e) {
-            log.warn("Could not fetch owner email for family member {}: {}", familyMemberId, e.getMessage());
+            log.warn("Could not fetch {} for family member {}: {}", label, familyMemberId, e.getMessage());
             return null;
         }
     }

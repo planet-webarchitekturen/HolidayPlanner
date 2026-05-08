@@ -10,6 +10,7 @@ import com.holidayplanner.eventservice.dto.EventTermResponse;
 import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.eventservice.port.NotificationPort;
+import com.holidayplanner.eventservice.repository.CaregiverRepository;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
@@ -34,6 +35,7 @@ public class EventTermCommandService {
 
     private final EventTermRepository eventTermRepository;
     private final EventRepository eventRepository;
+    private final CaregiverRepository caregiverRepository;
     private final EventTermEventPublisher eventTermEventPublisher;
     private final BookingServicePort bookingServicePort;
     private final NotificationPort notificationPort;
@@ -64,8 +66,11 @@ public class EventTermCommandService {
         EventTerm saved = eventTermRepository.save(term);
 
         if (newStatus == EventTermStatus.CANCELLED) {
-            List<String> caregiverIds = term.getCaregiverIds().stream()
-                    .map(UUID::toString)
+            List<String> caregiverEmails = term.getCaregiverIds().stream()
+                    .map(id -> caregiverRepository.findById(id)
+                            .map(c -> c.getEmail())
+                            .orElse(null))
+                    .filter(email -> email != null)
                     .collect(Collectors.toList());
             String cancelledBy = actor == CancellationActor.SYSTEM ? "SYSTEM" : "EVENT_OWNER";
             EventTermCancelledPayload payload = new EventTermCancelledPayload(
@@ -73,7 +78,7 @@ public class EventTermCommandService {
                     term.getEvent() != null ? term.getEvent().getShortTitle() : null,
                     term.getStartDateTime() != null ? term.getStartDateTime().toString() : null,
                     term.getEvent() != null ? term.getEvent().getOrganizationId() : null,
-                    caregiverIds,
+                    caregiverEmails,
                     cancelledBy);
             eventTermEventPublisher.publishEventTermCancelled(payload);
         }

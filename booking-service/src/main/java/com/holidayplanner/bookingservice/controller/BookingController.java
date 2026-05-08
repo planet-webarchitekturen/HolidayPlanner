@@ -36,6 +36,16 @@ public class BookingController {
         return ResponseEntity.ok(bookingQueryService.getBookingCount(eventTermId));
     }
 
+    @GetMapping("/event-term/{eventTermId}/emails")
+    public ResponseEntity<List<String>> getParticipantParentEmails(@PathVariable("eventTermId") UUID eventTermId) {
+        return ResponseEntity.ok(bookingQueryService.getParticipantParentEmails(eventTermId));
+    }
+
+    @GetMapping("/event-term/{eventTermId}/participant-names")
+    public ResponseEntity<List<String>> getParticipantDisplayNames(@PathVariable("eventTermId") UUID eventTermId) {
+        return ResponseEntity.ok(bookingQueryService.getParticipantDisplayNames(eventTermId));
+    }
+
     @GetMapping("/event-term/{eventTermId}/summary")
     public ResponseEntity<EventTermSummaryResponse> getEventTermSummary(@PathVariable("eventTermId") UUID eventTermId) {
         return ResponseEntity.ok(bookingQueryService.getEventTermSummary(eventTermId));
