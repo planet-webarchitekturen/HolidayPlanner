@@ -42,3 +42,6 @@ jwt:
 services:
   booking-service:
     url: ${BOOKING_SERVICE_URL:http://localhost:8082}
+
+service:
+  secret: ${SERVICE_SECRET:holidayplanner-internal-service-secret}

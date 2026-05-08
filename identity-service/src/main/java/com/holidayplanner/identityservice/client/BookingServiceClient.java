@@ -28,12 +28,15 @@ public class BookingServiceClient {
 
     private final RestClient restClient;
     private final String bookingServiceUrl;
+    private final String serviceSecret;
 
     public BookingServiceClient(
             RestClient.Builder restClientBuilder,
-            @Value("${services.booking-service.url:http://localhost:8082}") String bookingServiceUrl) {
+            @Value("${services.booking-service.url:http://localhost:8082}") String bookingServiceUrl,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret) {
         this.restClient = restClientBuilder.build();
         this.bookingServiceUrl = bookingServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     /**
@@ -47,6 +50,7 @@ public class BookingServiceClient {
         try {
             var response = restClient.get()
                     .uri(url)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         log.warn("Booking service returned 4xx for familyMemberId {}: {}", familyMemberId, res.getStatusCode());

@@ -131,6 +131,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
       NOTIFICATION_SERVICE_URL: http://notification-service:8089
+      BOOKING_SERVICE_URL: http://booking-service:8082
+      IDENTITY_SERVICE_URL: http://identity-service:8083
 
   identity-service:
     build:
@@ -153,6 +155,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+      SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
+      BOOKING_SERVICE_URL: http://booking-service:8082
 
   organization-service:
     build:
@@ -176,6 +180,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       EVENT_SERVICE_URL: http://event-service:8081
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
+      IDENTITY_SERVICE_URL: http://identity-service:8083
 
   payment-service:
     build:

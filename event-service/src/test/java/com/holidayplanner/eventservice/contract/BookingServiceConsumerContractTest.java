@@ -29,7 +29,7 @@ class BookingServiceConsumerContractTest {
 
     @BeforeEach
     void setUp() {
-        client = new BookingServiceClient(wm.baseUrl());
+        client = new BookingServiceClient(wm.baseUrl(), "test-secret");
     }
 
     @Test

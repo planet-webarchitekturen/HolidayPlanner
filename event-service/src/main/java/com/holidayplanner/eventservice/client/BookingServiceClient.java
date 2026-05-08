@@ -24,10 +24,13 @@ public class BookingServiceClient implements BookingServicePort {
             new ParameterizedTypeReference<>() {};
 
     private final RestClient restClient;
+    private final String serviceSecret;
 
     public BookingServiceClient(
-            @Value("${services.booking-service.url:http://localhost:8082}") String bookingServiceUrl) {
+            @Value("${services.booking-service.url:http://localhost:8082}") String bookingServiceUrl,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret) {
         this.restClient = RestClient.builder().baseUrl(bookingServiceUrl).build();
+        this.serviceSecret = serviceSecret;
     }
 
     @Override
@@ -35,6 +38,7 @@ public class BookingServiceClient implements BookingServicePort {
         try {
             Long count = restClient.get()
                     .uri("/api/bookings/event-term/{id}/count", eventTermId)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         throw new DownstreamServiceException("booking-service",
@@ -69,6 +73,7 @@ public class BookingServiceClient implements BookingServicePort {
         try {
             List<String> body = restClient.get()
                     .uri(uriTemplate, eventTermId)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(LIST_STRING);
             return body != null ? body : Collections.emptyList();

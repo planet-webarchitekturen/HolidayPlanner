@@ -15,12 +15,15 @@ public class IdentityServiceClient {
 
     private final RestClient restClient;
     private final String identityServiceUrl;
+    private final String serviceSecret;
 
     public IdentityServiceClient(
             RestClient.Builder restClientBuilder,
-            @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl) {
+            @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret) {
         this.restClient = restClientBuilder.build();
         this.identityServiceUrl = identityServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     public IdentityUserResponse getUser(UUID userId) {
@@ -28,6 +31,7 @@ public class IdentityServiceClient {
         try {
             return restClient.get()
                     .uri(url)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw new IllegalStateException("Identity service returned an error for user " + userId);
