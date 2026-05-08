@@ -53,9 +53,12 @@ public class BookingCommandService {
         Booking saved = bookingRepository.save(booking);
 
         if (status == BookingStatus.CONFIRMED) {
+            String termDate = eventTerm.getStartDateTime() != null
+                    ? eventTerm.getStartDateTime().toString() : null;
             BookingCreatedPayload payload = new BookingCreatedPayload(
                     saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                    status.name(), null, null, null, null, null);
+                    status.name(), null, eventTerm.getEventName(), termDate,
+                    eventTerm.getOrganizationId(), eventTerm.getPrice());
             bookingEventProducer.publishBookingCreated(payload);
         }
 
