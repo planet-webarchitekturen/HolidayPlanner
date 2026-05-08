@@ -34,6 +34,11 @@ server:
 jwt:
   secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
+service:
+  secret: ${SERVICE_SECRET:holidayplanner-internal-service-secret}
+
 services:
   identity-service:
     url: ${IDENTITY_SERVICE_URL:http://localhost:8083}
+  event-service:
+    url: ${EVENT_SERVICE_URL:http://localhost:8081}

@@ -70,6 +70,14 @@ public class EventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventCommandService.createEvent(request));
     }
 
+    @DeleteMapping("/organization/{organizationId}")
+    @PreAuthorize("hasRole('SERVICE')")
+    public ResponseEntity<Void> deleteEventsByOrganization(
+            @PathVariable("organizationId") UUID organizationId) {
+        eventCommandService.deleteEventsByOrganization(organizationId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{eventId}")
     @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<EventResponse> updateEvent(

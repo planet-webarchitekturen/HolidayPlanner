@@ -12,6 +12,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -59,5 +60,10 @@ public class EventCommandService {
         event.setMaximalAge(request.getMaximalAge());
         event.setPictureUrl(request.getPictureUrl());
         return EventResponse.from(eventRepository.save(event));
+    }
+
+    public void deleteEventsByOrganization(UUID organizationId) {
+        List<Event> events = eventRepository.findByOrganizationId(organizationId);
+        eventRepository.deleteAll(events);
     }
 }

@@ -61,6 +61,13 @@ public class OrganizationController {
         return ResponseEntity.ok(organizationQueryService.getOrganizationOverview(organizationId));
     }
 
+    @DeleteMapping("/{organizationId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteOrganization(@PathVariable("organizationId") UUID organizationId) {
+        organizationCommandService.deleteOrganization(organizationId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{organizationId}")
     public ResponseEntity<Organization> updateOrganization(
             @PathVariable("organizationId") UUID organizationId,
