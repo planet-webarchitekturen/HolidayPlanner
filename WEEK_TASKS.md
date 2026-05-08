@@ -125,3 +125,38 @@ All security code lives in `shared/src/main/java/com/holidayplanner/shared/secur
 | `SecurityUtils` | Static helpers: `getCurrentOrganizationId()`, `getCurrentUser()` |
 
 Each service instantiates these in its own `SecurityConfig` — no auto-wiring from the shared module, keeping each service's security configuration explicit and visible.
+
+---
+
+## Findings
+
+**Filter order matters more than expected.**
+`ServiceAuthenticationFilter` must run before `JwtAuthenticationFilter`. If reversed, a service-to-service request carrying only `X-Service-Secret` would hit the JWT filter first, find no `Authorization` header, and pass through unauthenticated — then fail the `@PreAuthorize("hasRole('SERVICE')")` check. The order makes the two auth paths mutually exclusive per request.
+
+**Org-scope cannot live at the HTTP layer.**
+We initially considered enforcing org-scope in the `SecurityFilterChain` via path matchers. This does not work because the org ID of the resource being modified is only known after the database is queried — it is not in the URL. The check must happen inside the service method, after the record is loaded, which is why it sits in `*CommandService` rather than in security config.
+
+**`@Component` on a filter causes it to run twice.**
+An earlier version of the identity-service had its local `JwtAuthenticationFilter` annotated with `@Component`. Spring Boot auto-registers all `OncePerRequestFilter` beans as servlet filters, and the `SecurityConfig` also added it to the security chain — resulting in the filter running twice per request. The fix is to never annotate security filters with `@Component`; instead instantiate them explicitly in `SecurityConfig` as `@Bean`.
+
+**A stale Docker image silently breaks security rules.**
+When a service image is rebuilt but not pushed, or pushed but not re-pulled, the running container has old code. We discovered this when `permitAll()` rules added for the login/register endpoints were not taking effect in the running container — the image predated the commit that added those rules. Rule: always rebuild, push, and recreate the container after any `SecurityConfig` change.
+
+**Symmetric JWT secret is a single point of failure.**
+Because every service shares one secret, a leak of `JWT_SECRET` compromises the entire platform simultaneously. With asymmetric keys, each service would only hold a public key; the private key stays in the identity-service alone.
+
+---
+
+## Open Questions
+
+**Should org-scope move to an API gateway?**
+Currently each service re-implements the same org-scope check independently. A dedicated gateway (e.g. Spring Cloud Gateway) could extract the `organizationId` from the JWT and enforce scoping centrally before requests reach services. This would remove duplication but add another infrastructure component and a single point of failure.
+
+**When should the symmetric JWT secret become asymmetric?**
+HS384 with a shared secret is fine for a controlled environment where all services are owned by one team. If third-party services ever need to validate tokens without receiving the private key, we would need RS256/ES256. The jjwt library already supports this — the switch is a configuration change in identity-service plus distributing the public key to other services.
+
+**How should token revocation be handled?**
+Currently a JWT is valid until it expires (24 hours). There is no way to invalidate a token immediately (e.g. after a user changes their password or is removed from an organisation). Options are: a token blocklist in Redis, short-lived tokens (e.g. 15 minutes) paired with a refresh token, or switching to opaque tokens with a central introspection endpoint.
+
+**Should `ROLE_SERVICE` be finer-grained?**
+All internal service calls share one `ROLE_SERVICE` authority. This means any service that knows `SERVICE_SECRET` can call any internal endpoint. A future improvement would be per-service secrets or a claims-based approach so that organisation-service can only call the specific delete endpoint on event-service, not any `SERVICE`-protected endpoint across the platform.
