@@ -36,6 +36,12 @@ public class BookingQueryService {
         return bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
     }
 
+    public BookingResponse getBookingById(UUID bookingId) {
+        return bookingRepository.findById(bookingId)
+                .map(BookingResponse::from)
+                .orElseThrow(() -> new com.holidayplanner.bookingservice.exception.BookingNotFoundException(bookingId));
+    }
+
     public List<BookingResponse> getBookingsForFamilyMember(UUID familyMemberId) {
         return bookingRepository.findByFamilyMemberId(familyMemberId).stream()
                 .map(BookingResponse::from)

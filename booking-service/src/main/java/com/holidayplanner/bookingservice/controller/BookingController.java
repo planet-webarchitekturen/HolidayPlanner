@@ -69,8 +69,13 @@ public class BookingController {
         return ResponseEntity.ok(bookingCommandService.createBooking(familyMemberId, eventTermId));
     }
 
+    @GetMapping("/{bookingId}")
+    public ResponseEntity<BookingResponse> getBooking(@PathVariable("bookingId") UUID bookingId) {
+        return ResponseEntity.ok(bookingQueryService.getBookingById(bookingId));
+    }
+
     @DeleteMapping("/{bookingId}")
-    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<BookingResponse> cancelBooking(@PathVariable("bookingId") UUID bookingId) {
         return ResponseEntity.ok(bookingCommandService.cancelBooking(bookingId));
     }
