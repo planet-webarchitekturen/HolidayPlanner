@@ -38,10 +38,13 @@ public class BookingCommandService {
             throw new IllegalStateException("Event term is not active: " + eventTermId);
         }
 
-        UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
-        if (currentOrgId != null && eventTerm.getOrganizationId() != null
-                && !currentOrgId.equals(eventTerm.getOrganizationId())) {
-            throw new AccessDeniedException("Event term belongs to a different organization");
+        // Cross-org check: only non-USER roles are org-scoped (parents/guardians can book any org's events)
+        if (!SecurityUtils.hasRole("USER") && !SecurityUtils.hasRole("SERVICE")) {
+            UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
+            if (currentOrgId != null && eventTerm.getOrganizationId() != null
+                    && !currentOrgId.equals(eventTerm.getOrganizationId())) {
+                throw new AccessDeniedException("Event term belongs to a different organization");
+            }
         }
 
         long confirmedCount = bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
