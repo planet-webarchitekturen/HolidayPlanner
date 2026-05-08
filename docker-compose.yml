@@ -94,6 +94,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      identity-service:
+        condition: service_started
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DB_HOST: postgres
@@ -102,6 +104,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       SERVICES_EVENT_SERVICE_URL: http://event-service:8081
+      IDENTITY_SERVICE_URL: http://identity-service:8083
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 

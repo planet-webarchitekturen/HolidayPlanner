@@ -1,6 +1,7 @@
 package com.holidayplanner.bookingservice.command;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
+import com.holidayplanner.bookingservice.client.IdentityServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
@@ -25,6 +26,7 @@ public class BookingCommandService {
 
     private final BookingRepository bookingRepository;
     private final EventServiceClient eventServiceClient;
+    private final IdentityServiceClient identityServiceClient;
     private final BookingEventProducer bookingEventProducer;
 
     public BookingResponse createBooking(UUID familyMemberId, UUID eventTermId) {
@@ -55,9 +57,10 @@ public class BookingCommandService {
         if (status == BookingStatus.CONFIRMED) {
             String termDate = eventTerm.getStartDateTime() != null
                     ? eventTerm.getStartDateTime().toString() : null;
+            String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
             BookingCreatedPayload payload = new BookingCreatedPayload(
                     saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                    status.name(), null, eventTerm.getEventName(), termDate,
+                    status.name(), parentEmail, eventTerm.getEventName(), termDate,
                     eventTerm.getOrganizationId(), eventTerm.getPrice());
             bookingEventProducer.publishBookingCreated(payload);
         }

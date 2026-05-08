@@ -1,0 +1,60 @@
+package com.holidayplanner.bookingservice.client;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.Map;
+import java.util.UUID;
+
+@Slf4j
+@Component
+public class IdentityServiceClient {
+
+    private final RestClient restClient;
+    private final String identityServiceUrl;
+
+    public IdentityServiceClient(
+            RestClient.Builder restClientBuilder,
+            @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl) {
+        this.restClient = restClientBuilder.build();
+        this.identityServiceUrl = identityServiceUrl;
+    }
+
+    public String getOwnerEmail(UUID familyMemberId) {
+        String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId + "/owner-email";
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, String> response = restClient.get()
+                    .uri(url)
+                    .headers(headers -> {
+                        String token = extractCurrentToken();
+                        if (token != null) headers.setBearerAuth(token);
+                    })
+                    .retrieve()
+                    .body(Map.class);
+            return response != null ? response.get("email") : null;
+        } catch (Exception e) {
+            log.warn("Could not fetch owner email for family member {}: {}", familyMemberId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractCurrentToken() {
+        try {
+            ServletRequestAttributes attrs =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs == null) return null;
+            HttpServletRequest request = attrs.getRequest();
+            String header = request.getHeader("Authorization");
+            if (header != null && header.startsWith("Bearer ")) {
+                return header.substring(7);
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+}

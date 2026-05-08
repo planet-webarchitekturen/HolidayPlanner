@@ -31,7 +31,13 @@ public class SecurityConfig {
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(serviceFilter, JwtAuthenticationFilter.class)
-            .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
+            .exceptionHandling(e -> e
+                .accessDeniedHandler((req, res, ex) -> {
+                    res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"error\":\"Forbidden\"}");
+                })
+                .authenticationEntryPoint((req, res, ex) -> {
                 res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 res.setContentType("application/json");
                 res.getWriter().write("{\"error\":\"Unauthorized\"}");

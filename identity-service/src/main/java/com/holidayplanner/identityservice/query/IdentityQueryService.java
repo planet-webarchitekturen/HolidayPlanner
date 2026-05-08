@@ -94,4 +94,10 @@ public class IdentityQueryService {
     public List<Caregiver> getAllCaregivers() {
         return caregiverRepository.findAll();
     }
+
+    public String getUserEmailByFamilyMemberId(UUID familyMemberId) {
+        FamilyMember fm = familyMemberRepository.findById(familyMemberId)
+                .orElseThrow(() -> new RuntimeException("Family member not found: " + familyMemberId));
+        return fm.getUser().getEmail();
+    }
 }

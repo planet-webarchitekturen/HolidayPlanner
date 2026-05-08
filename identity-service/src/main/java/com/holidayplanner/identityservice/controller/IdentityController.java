@@ -116,6 +116,13 @@ public class IdentityController {
         return ResponseEntity.ok(commandService.updateFamilyMember(memberId, firstName, lastName, birthDate, zip));
     }
 
+    @GetMapping("/api/identity/family-members/{memberId}/owner-email")
+    public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
+            @PathVariable("memberId") UUID memberId) {
+        String email = queryService.getUserEmailByFamilyMemberId(memberId);
+        return ResponseEntity.ok(java.util.Map.of("email", email));
+    }
+
     @DeleteMapping("/api/identity/family-members/{memberId}")
     public ResponseEntity<Void> removeFamilyMember(@PathVariable("memberId") UUID memberId) {
         commandService.removeFamilyMember(memberId);
