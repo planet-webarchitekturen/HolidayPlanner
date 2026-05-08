@@ -11,7 +11,9 @@ import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,6 +32,12 @@ public class BookingCommandService {
 
         if (!"ACTIVE".equals(eventTerm.getStatus())) {
             throw new IllegalStateException("Event term is not active: " + eventTermId);
+        }
+
+        UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
+        if (currentOrgId != null && eventTerm.getOrganizationId() != null
+                && !currentOrgId.equals(eventTerm.getOrganizationId())) {
+            throw new AccessDeniedException("Event term belongs to a different organization");
         }
 
         long confirmedCount = bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);

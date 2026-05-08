@@ -20,4 +20,5 @@ public class EventTermDetailResponse {
     private LocalDateTime endDateTime;
     private int maxParticipants;
     private String status;
+    private UUID organizationId;
 }

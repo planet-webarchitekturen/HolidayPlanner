@@ -6,7 +6,9 @@ import com.holidayplanner.eventservice.dto.EventResponse;
 import com.holidayplanner.eventservice.dto.UpdateEventRequest;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.shared.model.Event;
+import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +23,8 @@ public class EventCommandService {
 
     public EventResponse createEvent(CreateEventRequest request) {
         Event event = new Event();
-        event.setOrganizationId(request.getOrganizationId());
+        UUID jwtOrgId = SecurityUtils.getCurrentOrganizationId();
+        event.setOrganizationId(jwtOrgId != null ? jwtOrgId : request.getOrganizationId());
         event.setEventOwnerId(request.getEventOwnerId());
         event.setShortTitle(request.getShortTitle());
         event.setDescription(request.getDescription());
@@ -39,6 +42,13 @@ public class EventCommandService {
     public EventResponse updateEvent(UUID eventId, UpdateEventRequest request) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventNotFoundException(eventId));
+
+        UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
+        if (currentOrgId != null && event.getOrganizationId() != null
+                && !currentOrgId.equals(event.getOrganizationId())) {
+            throw new AccessDeniedException("Event belongs to a different organization");
+        }
+
         event.setShortTitle(request.getShortTitle());
         event.setDescription(request.getDescription());
         event.setLocation(request.getLocation());

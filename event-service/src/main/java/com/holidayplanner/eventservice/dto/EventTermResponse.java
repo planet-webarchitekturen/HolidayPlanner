@@ -24,6 +24,7 @@ public class EventTermResponse {
     private int minParticipants;
     private int maxParticipants;
     private EventTermStatus status;
+    private UUID organizationId;
 
     public static EventTermResponse from(EventTerm term) {
         EventTermResponse r = new EventTermResponse();
@@ -37,6 +38,7 @@ public class EventTermResponse {
         r.minParticipants = term.getMinParticipants();
         r.maxParticipants = term.getMaxParticipants();
         r.status = term.getStatus();
+        r.organizationId = term.getEvent().getOrganizationId();
         return r;
     }
 }

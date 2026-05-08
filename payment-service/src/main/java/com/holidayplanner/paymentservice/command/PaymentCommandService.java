@@ -5,7 +5,9 @@ import com.holidayplanner.paymentservice.repository.PaymentRepository;
 import com.holidayplanner.shared.kafka.payload.PaymentRefundedPayload;
 import com.holidayplanner.shared.model.Payment;
 import com.holidayplanner.shared.model.PaymentStatus;
+import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,12 @@ public class PaymentCommandService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
 
+        UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
+        if (currentOrgId != null && payment.getOrganizationId() != null
+                && !currentOrgId.equals(payment.getOrganizationId())) {
+            throw new AccessDeniedException("Payment belongs to a different organization");
+        }
+
         payment.setStatus(PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
         payment.setNote(note);
@@ -45,6 +53,12 @@ public class PaymentCommandService {
     public Payment refundPayment(UUID paymentId, String note) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+
+        UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
+        if (currentOrgId != null && payment.getOrganizationId() != null
+                && !currentOrgId.equals(payment.getOrganizationId())) {
+            throw new AccessDeniedException("Payment belongs to a different organization");
+        }
 
         payment.setStatus(PaymentStatus.REFUNDED);
         payment.setRefundedAt(LocalDateTime.now());
