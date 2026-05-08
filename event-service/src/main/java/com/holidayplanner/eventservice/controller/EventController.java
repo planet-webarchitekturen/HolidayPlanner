@@ -20,6 +20,7 @@ import com.holidayplanner.eventservice.query.RemarkQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -64,11 +65,13 @@ public class EventController {
     // --- Events (commands) ---
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<EventResponse> createEvent(@RequestBody CreateEventRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventCommandService.createEvent(request));
     }
 
     @PutMapping("/{eventId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<EventResponse> updateEvent(
             @PathVariable("eventId") UUID eventId,
             @RequestBody UpdateEventRequest request) {

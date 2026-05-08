@@ -13,6 +13,7 @@ import com.holidayplanner.shared.model.TeamMember;
 import com.holidayplanner.shared.model.TeamMemberRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ public class OrganizationController {
     // --- Organization Endpoints ---
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Organization> createOrganization(
             @RequestParam("name") String name,
             @RequestParam("bankAccount") String bankAccount,
@@ -81,6 +83,7 @@ public class OrganizationController {
     }
 
     @PostMapping("/{organizationId}/team-members")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<TeamMember> addTeamMember(
             @PathVariable("organizationId") UUID organizationId,
             @RequestParam("userId") UUID userId,

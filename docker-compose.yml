@@ -87,10 +87,12 @@ services:
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: booking_db
       DB_USER: postgres
       DB_PASSWORD: postgres
       SERVICES_EVENT_SERVICE_URL: http://event-service:8081
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   event-service:
     build:
@@ -107,9 +109,11 @@ services:
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: event_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   identity-service:
     build:
@@ -129,6 +133,7 @@ services:
       DB_NAME: identity_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   organization-service:
     build:
@@ -148,6 +153,7 @@ services:
       DB_NAME: organization_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   payment-service:
     build:
@@ -167,6 +173,7 @@ services:
       DB_NAME: payment_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   notification-service:
     build:
@@ -184,6 +191,7 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-your-email@gmail.com}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-your-password}
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
   booklet-service:
     build:
@@ -200,6 +208,7 @@ services:
       DB_NAME: booklet_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
 
 volumes:
   postgres_data:

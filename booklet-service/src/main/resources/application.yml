@@ -5,6 +5,9 @@ spring:
 server:
   port: 8087
 
+jwt:
+  secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+
 services:
   organization-service:
     url: ${SERVICES_ORGANIZATION_SERVICE_URL:http://localhost:8084}

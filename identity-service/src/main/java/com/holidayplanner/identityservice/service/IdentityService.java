@@ -67,9 +67,8 @@ public class IdentityService {
             throw new RuntimeException("Invalid password");
         }
 
-        // Generate JWT token with user's roles
         List<String> roles = List.of(user.getRole().toString());
-        return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles);
+        return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
     }
 
     public User updatePhoneNumber(UUID userId, String phoneNumber) {

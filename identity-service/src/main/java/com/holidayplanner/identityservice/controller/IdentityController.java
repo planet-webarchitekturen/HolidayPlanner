@@ -10,6 +10,7 @@ import com.holidayplanner.identityservice.query.IdentityQueryService;
 import com.holidayplanner.identityservice.service.IdentityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -41,7 +42,7 @@ public class IdentityController {
 
     // --- Authentication Endpoints ---
 
-    @PostMapping("/api/auth/register")
+    @PostMapping({"/api/auth/register", "/api/identity/users/register"})
     public ResponseEntity<UserResponse> register(
             @RequestParam("email") String email,
             @RequestParam("password") String password,
@@ -51,7 +52,7 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @PostMapping("/api/auth/login")
+    @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
         String token = identityService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
@@ -69,6 +70,7 @@ public class IdentityController {
     // --- User Endpoints ---
 
     @GetMapping("/api/identity/users/{userId}")
+    @PreAuthorize("hasAnyRole('USER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'EVENT_OWNER', 'ACCOUNTANT')")
     public ResponseEntity<UserResponse> getUser(@PathVariable("userId") UUID userId) {
         User user = queryService.getUserById(userId);
         return ResponseEntity.ok(UserResponse.from(user));

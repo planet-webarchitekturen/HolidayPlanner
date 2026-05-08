@@ -7,6 +7,7 @@ import com.holidayplanner.bookingservice.dto.EventTermSummaryResponse;
 import com.holidayplanner.bookingservice.query.BookingQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,6 +52,7 @@ public class BookingController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('USER', 'EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<BookingResponse> createBooking(
             @RequestParam("familyMemberId") UUID familyMemberId,
             @RequestParam("eventTermId") UUID eventTermId) {
@@ -58,6 +60,7 @@ public class BookingController {
     }
 
     @DeleteMapping("/{bookingId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<BookingResponse> cancelBooking(@PathVariable("bookingId") UUID bookingId) {
         return ResponseEntity.ok(bookingCommandService.cancelBooking(bookingId));
     }

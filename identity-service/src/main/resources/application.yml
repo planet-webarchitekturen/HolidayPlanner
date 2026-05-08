@@ -38,8 +38,8 @@ server:
 
 # JWT Configuration
 jwt:
-  secret: super_secret_key_that_is_at_least_256_bits_long_for_HS256_algorithm_support_needed
-  expiration: 3600000  # 1 hour in milliseconds
+  secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+  expiration-ms: 86400000  # 24 hours
 
 # Inter-service communication URLs
 services:

@@ -1,6 +1,7 @@
 package com.holidayplanner.identityservice.config;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,100 +17,39 @@ import java.util.UUID;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:super_secret_key_that_is_at_least_256_bits_long_for_HS256_algorithm_support_needed}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:3600000}")  // 1 hour in milliseconds
-    private int jwtExpirationMs;
+    @Value("${jwt.expiration-ms:86400000}")
+    private long jwtExpirationMs;
 
-    /**
-     * Generate JWT token with user claims
-     */
-    public String generateToken(UUID userId, UUID organizationId, List<String> roles) {
+    public String generateToken(UUID userId, UUID organizationId, List<String> roles, String email) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
-
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-
+        Date expiry = new Date(now.getTime() + jwtExpirationMs);
         return Jwts.builder()
-                .setSubject(userId.toString())
+                .subject(userId.toString())
                 .claim("organizationId", organizationId.toString())
                 .claim("roles", roles)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS256)
+                .claim("email", email)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(getSigningKey())
                 .compact();
     }
 
-    /**
-     * Validate JWT token
-     */
-    public boolean validateToken(String token) {
-        try {
-            SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-            Jwts.parser()
-                    .setSigningKey(key)
-                    .parseClaimsJws(token);
-            return true;
-        } catch (SecurityException e) {
-            log.error("Invalid JWT signature: {}", e);
-        } catch (MalformedJwtException e) {
-            log.error("Invalid JWT token: {}", e);
-        } catch (ExpiredJwtException e) {
-            log.error("Expired JWT token: {}", e);
-        } catch (UnsupportedJwtException e) {
-            log.error("Unsupported JWT token: {}", e);
-        } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e);
-        }
-        return false;
-    }
-
-    /**
-     * Get user ID from JWT token
-     */
-    public UUID getUserIdFromToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        Claims claims = Jwts.parser()
-                .setSigningKey(key)
-                .parseClaimsJws(token)
-                .getBody();
-        return UUID.fromString(claims.getSubject());
-    }
-
-    /**
-     * Get organization ID from JWT token
-     */
-    public UUID getOrganizationIdFromToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        Claims claims = Jwts.parser()
-                .setSigningKey(key)
-                .parseClaimsJws(token)
-                .getBody();
-        return UUID.fromString(claims.get("organizationId", String.class));
-    }
-
-    /**
-     * Get roles from JWT token
-     */
-    @SuppressWarnings("unchecked")
-    public List<String> getRolesFromToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        Claims claims = Jwts.parser()
-                .setSigningKey(key)
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.get("roles", List.class);
-    }
-
-    /**
-     * Get all claims from JWT token
-     */
-    public Claims getAllClaimsFromToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    public Claims validateAndParseClaims(String token) {
         return Jwts.parser()
-                .setSigningKey(key)
-                .parseClaimsJws(token)
-                .getBody();
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public UUID getUserIdFromToken(String token) {
+        return UUID.fromString(validateAndParseClaims(token).getSubject());
+    }
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 }

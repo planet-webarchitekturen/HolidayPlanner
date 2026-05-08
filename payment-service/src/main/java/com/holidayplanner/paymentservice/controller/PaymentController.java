@@ -6,6 +6,7 @@ import com.holidayplanner.paymentservice.query.PaymentQueryService;
 import com.holidayplanner.shared.model.Payment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,6 +62,7 @@ public class PaymentController {
     }
 
     @PatchMapping("/{paymentId}/pay")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
     public ResponseEntity<Payment> markAsPaid(
             @PathVariable("paymentId") UUID paymentId,
             @RequestParam(value = "note", required = false) String note) {
@@ -68,6 +70,7 @@ public class PaymentController {
     }
 
     @PatchMapping("/{paymentId}/refund")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
     public ResponseEntity<Payment> refundPayment(
             @PathVariable("paymentId") UUID paymentId,
             @RequestParam(value = "note", required = false) String note) {

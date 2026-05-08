@@ -29,4 +29,11 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 server:
-  port: 8096
+  port: 8082
+
+jwt:
+  secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+
+services:
+  event-service:
+    url: ${SERVICES_EVENT_SERVICE_URL:http://localhost:8081}

@@ -1,4 +1,4 @@
-package com.holidayplanner.identityservice.config;
+package com.holidayplanner.bookingservice.config;
 
 import com.holidayplanner.shared.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -9,8 +9,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -26,11 +24,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/identity/health").permitAll()
-                .requestMatchers("/api/auth/login").permitAll()
-                .requestMatchers("/api/auth/register").permitAll()
-                .requestMatchers("/api/identity/auth/login").permitAll()
-                .requestMatchers("/api/identity/users/register").permitAll()
+                .requestMatchers("/api/bookings/health").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
@@ -46,10 +40,5 @@ public class SecurityConfig {
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             @Value("${jwt.secret}") String secret) {
         return new JwtAuthenticationFilter(secret);
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }
