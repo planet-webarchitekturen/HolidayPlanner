@@ -59,6 +59,11 @@ public class PaymentController {
         return ResponseEntity.ok(paymentQueryService.getEventTermPaymentOverview(eventTermId));
     }
 
+    @GetMapping("/{paymentId}")
+    public ResponseEntity<Payment> getPaymentById(@PathVariable("paymentId") UUID paymentId) {
+        return ResponseEntity.ok(paymentQueryService.getPaymentById(paymentId));
+    }
+
     @GetMapping("/booking/{bookingId}")
     public ResponseEntity<Payment> getPaymentByBooking(@PathVariable("bookingId") UUID bookingId) {
         return ResponseEntity.ok(paymentQueryService.getPaymentByBooking(bookingId));

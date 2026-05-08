@@ -45,6 +45,11 @@ public class PaymentQueryService {
                 .orElseThrow(() -> new RuntimeException("Payment not found for booking: " + bookingId));
     }
 
+    public Payment getPaymentById(UUID paymentId) {
+        return paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+    }
+
     public BigDecimal calculateBalance(UUID organizationId) {
         return paymentRepository.findByOrganizationId(organizationId).stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.PAID)

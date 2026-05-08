@@ -27,3 +27,6 @@ server:
 
 jwt:
   secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+
+service:
+  secret: ${SERVICE_SECRET:holidayplanner-internal-service-secret}

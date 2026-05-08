@@ -197,6 +197,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+      SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   notification-service:
     build:
@@ -216,6 +217,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-your-email@gmail.com}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-your-password}
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
+      SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   booklet-service:
     build:

@@ -105,12 +105,34 @@ public class BookingCommandService {
     }
 
     public void cancelAllBookings(UUID eventTermId) {
+        String eventName = null;
+        String termDate = null;
+        try {
+            EventTermDetailResponse term = eventServiceClient.getEventTerm(eventTermId);
+            eventName = term.getEventName();
+            termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+        } catch (Exception e) {
+            log.warn("Could not fetch event term for cancelAllBookings: {}", e.getMessage());
+        }
+        final String resolvedEventName = eventName;
+        final String resolvedTermDate = termDate;
+
         List<Booking> active = bookingRepository.findByEventTermId(eventTermId).stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .toList();
         active.forEach(b -> {
             b.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(b);
+            String parentEmail = null;
+            try {
+                parentEmail = identityServiceClient.getOwnerEmail(b.getFamilyMemberId());
+            } catch (Exception e) {
+                log.warn("Could not fetch parentEmail for cancelAllBookings booking {}: {}", b.getId(), e.getMessage());
+            }
+            BookingCancelledPayload payload = new BookingCancelledPayload(
+                    b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
+                    parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled");
+            bookingEventProducer.publishBookingCancelled(payload);
         });
     }
 
