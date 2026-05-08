@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ public class BookletController {
     }
 
     @GetMapping("/organizations/{organizationId}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<byte[]> generateComposedOrganizationBooklet(
             @PathVariable("organizationId") UUID organizationId) throws IOException {
 
@@ -40,6 +42,7 @@ public class BookletController {
 
     // Generate full organization booklet as PDF download
     @PostMapping("/organization")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<byte[]> generateBooklet(
             @RequestParam("organizationName") String organizationName,
             @RequestParam("contactInfo") String contactInfo,
@@ -58,6 +61,7 @@ public class BookletController {
 
     // Generate participant list PDF for caregiver
     @PostMapping("/participant-list")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<byte[]> generateParticipantList(
             @RequestParam("eventName") String eventName,
             @RequestParam("termDate") String termDate,

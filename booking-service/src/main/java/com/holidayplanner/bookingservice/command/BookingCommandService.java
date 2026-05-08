@@ -14,12 +14,14 @@ import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
 import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingCommandService {
@@ -75,9 +77,20 @@ public class BookingCommandService {
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
+        String parentEmail = null;
+        String eventName = null;
+        String termDate = null;
+        try {
+            parentEmail = identityServiceClient.getOwnerEmail(booking.getFamilyMemberId());
+            EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
+            eventName = term.getEventName();
+            termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+        } catch (Exception e) {
+            log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
+        }
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                null, null, null, "parent");
+                parentEmail, eventName, termDate, "parent");
         bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
@@ -102,14 +115,33 @@ public class BookingCommandService {
         List<Booking> waitlisted = bookingRepository
                 .findByEventTermIdAndStatus(eventTermId, BookingStatus.WAITLISTED);
 
+        String eventName = null;
+        String termDate = null;
+        try {
+            EventTermDetailResponse term = eventServiceClient.getEventTerm(eventTermId);
+            eventName = term.getEventName();
+            termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+        } catch (Exception e) {
+            log.warn("Could not fetch event term for WaitlistPromotedPayload: {}", e.getMessage());
+        }
+
+        final String resolvedEventName = eventName;
+        final String resolvedTermDate = termDate;
+
         waitlisted.stream()
                 .limit(slots)
                 .forEach(b -> {
                     b.setStatus(BookingStatus.CONFIRMED);
                     bookingRepository.save(b);
+                    String parentEmail = null;
+                    try {
+                        parentEmail = identityServiceClient.getOwnerEmail(b.getFamilyMemberId());
+                    } catch (Exception e) {
+                        log.warn("Could not fetch parentEmail for WaitlistPromotedPayload booking {}: {}", b.getId(), e.getMessage());
+                    }
                     WaitlistPromotedPayload payload = new WaitlistPromotedPayload(
                             b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                            null, null, null);
+                            parentEmail, resolvedEventName, resolvedTermDate);
                     bookingEventProducer.publishWaitlistPromoted(payload);
                 });
     }

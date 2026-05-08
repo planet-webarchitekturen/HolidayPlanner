@@ -69,6 +69,7 @@ public class OrganizationController {
     }
 
     @PutMapping("/{organizationId}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<Organization> updateOrganization(
             @PathVariable("organizationId") UUID organizationId,
             @RequestParam("bankAccount") String bankAccount,
@@ -103,6 +104,7 @@ public class OrganizationController {
     }
 
     @DeleteMapping("/team-members/{teamMemberId}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<Void> removeTeamMember(@PathVariable("teamMemberId") UUID teamMemberId) {
         organizationCommandService.removeTeamMember(teamMemberId);
         return ResponseEntity.noContent().build();
@@ -116,6 +118,7 @@ public class OrganizationController {
     }
 
     @PostMapping("/{organizationId}/sponsors")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<Sponsor> addSponsor(
             @PathVariable("organizationId") UUID organizationId,
             @RequestParam("name") String name,
@@ -124,6 +127,7 @@ public class OrganizationController {
     }
 
     @DeleteMapping("/sponsors/{sponsorId}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<Void> removeSponsor(@PathVariable("sponsorId") UUID sponsorId) {
         organizationCommandService.removeSponsor(sponsorId);
         return ResponseEntity.noContent().build();
