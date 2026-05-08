@@ -5,8 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.time.Instant;
-
 /**
  * Base class for all domain events in the Identity Service.
  * 
@@ -29,7 +27,7 @@ public class DomainEvent {
     private String version;
     
     @JsonProperty("timestamp")
-    private Instant timestamp;
+    private String timestamp;
     
     @JsonProperty("source")
     private String source;
@@ -44,7 +42,7 @@ public class DomainEvent {
         DomainEvent event = new DomainEvent();
         event.setEventType(eventType);
         event.setVersion("1");
-        event.setTimestamp(Instant.now());
+        event.setTimestamp(java.time.Instant.now().toString());
         event.setSource("identity-service");
         event.setPayload(payload);
         return event;
