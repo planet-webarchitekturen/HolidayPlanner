@@ -15,12 +15,15 @@ public class OrganizationServiceClient {
 
     private final RestClient restClient;
     private final String organizationServiceUrl;
+    private final String serviceSecret;
 
     public OrganizationServiceClient(
             RestClient.Builder restClientBuilder,
-            @Value("${services.organization-service.url:http://localhost:8084}") String organizationServiceUrl) {
+            @Value("${services.organization-service.url:http://localhost:8084}") String organizationServiceUrl,
+            @Value("${service.secret}") String serviceSecret) {
         this.restClient = restClientBuilder.build();
         this.organizationServiceUrl = organizationServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     public OrganizationDto getOrganization(UUID organizationId) {
@@ -41,6 +44,7 @@ public class OrganizationServiceClient {
         try {
             T result = restClient.get()
                     .uri(organizationServiceUrl + path)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(responseType);
             if (result == null) {
@@ -56,6 +60,7 @@ public class OrganizationServiceClient {
         try {
             List<T> result = restClient.get()
                     .uri(organizationServiceUrl + path)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(responseType);
             return result != null ? result : List.of();

@@ -15,18 +15,22 @@ public class EventServiceClient {
 
     private final RestClient restClient;
     private final String eventServiceUrl;
+    private final String serviceSecret;
 
     public EventServiceClient(
             RestClient.Builder restClientBuilder,
-            @Value("${services.event-service.url:http://localhost:8081}") String eventServiceUrl) {
+            @Value("${services.event-service.url:http://localhost:8081}") String eventServiceUrl,
+            @Value("${service.secret}") String serviceSecret) {
         this.restClient = restClientBuilder.build();
         this.eventServiceUrl = eventServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     public List<EventDto> getEventsByOrganization(UUID organizationId) {
         try {
             List<EventDto> result = restClient.get()
                     .uri(eventServiceUrl + "/api/events/organization/" + organizationId)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<EventDto>>() {});
             return result != null ? result : List.of();
