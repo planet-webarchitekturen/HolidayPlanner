@@ -12,7 +12,7 @@ import java.util.UUID;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
-
+    // SpringData JPA generates the implementation based on method names
     List<Booking> findByEventTermId(UUID eventTermId);
 
     List<Booking> findByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);

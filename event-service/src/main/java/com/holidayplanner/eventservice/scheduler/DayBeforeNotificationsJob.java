@@ -25,7 +25,7 @@ public class DayBeforeNotificationsJob {
     private final BookingServicePort bookingServicePort;
     private final IdentityServicePort identityServicePort;
     private final EventTermEventPublisher eventTermEventPublisher;
-
+    // Runs at 02:15 AM every day, gets all ACTIVE event terms starting the next day, fetches participant names and caregiver emails and publishes a Kafka event for each caregiver.
     @Scheduled(cron = "${event-service.scheduler.day-before-cron:0 15 2 * * *}")
     public void scheduleDayBeforeNotifications() {
         LocalDate tomorrow = LocalDate.now().plusDays(1);

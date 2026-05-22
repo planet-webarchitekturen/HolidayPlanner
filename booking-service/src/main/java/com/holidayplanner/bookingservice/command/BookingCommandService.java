@@ -38,7 +38,8 @@ public class BookingCommandService {
             throw new IllegalStateException("Event term is not active: " + eventTermId);
         }
 
-        // Cross-org check: only non-USER roles are org-scoped (parents/guardians can book any org's events)
+        // Cross-org check: only non-USER roles are org-scoped (parents/guardians can
+        // book any org's events)
         if (!SecurityUtils.hasRole("USER") && !SecurityUtils.hasRole("SERVICE")) {
             UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
             if (currentOrgId != null && eventTerm.getOrganizationId() != null
@@ -61,7 +62,8 @@ public class BookingCommandService {
 
         if (status == BookingStatus.CONFIRMED) {
             String termDate = eventTerm.getStartDateTime() != null
-                    ? eventTerm.getStartDateTime().toString() : null;
+                    ? eventTerm.getStartDateTime().toString()
+                    : null;
             String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
             BookingCreatedPayload payload = new BookingCreatedPayload(
                     saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
@@ -74,8 +76,11 @@ public class BookingCommandService {
     }
 
     public BookingResponse cancelBooking(UUID bookingId) {
+
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+                .orElseThrow(() -> new BookingNotFoundException(bookingId)); // orElse Throw catches empty returns and
+                                                                             // throws exeption therefore
+                                                                             // Optional<Booking> is not needed
 
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
@@ -162,7 +167,8 @@ public class BookingCommandService {
                     try {
                         parentEmail = identityServiceClient.getOwnerEmail(b.getFamilyMemberId());
                     } catch (Exception e) {
-                        log.warn("Could not fetch parentEmail for WaitlistPromotedPayload booking {}: {}", b.getId(), e.getMessage());
+                        log.warn("Could not fetch parentEmail for WaitlistPromotedPayload booking {}: {}", b.getId(),
+                                e.getMessage());
                     }
                     WaitlistPromotedPayload payload = new WaitlistPromotedPayload(
                             b.getId(), b.getFamilyMemberId(), b.getEventTermId(),

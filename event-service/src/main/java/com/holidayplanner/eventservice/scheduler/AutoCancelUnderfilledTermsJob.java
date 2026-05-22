@@ -22,6 +22,7 @@ public class AutoCancelUnderfilledTermsJob {
     private final EventTermCommandService eventTermCommandService;
     private final BookingServicePort bookingServicePort;
 
+    // Runs on 03:00 AM every day, gets all ACTIVE event terms asks booking-service for the count of confirmed bookings. If the count is below the minimum, cancels the term.
     @Scheduled(cron = "${event-service.scheduler.auto-cancel-cron:0 0 3 * * *}")
     public void autoCancelUnderfilledTerms() {
         LocalDateTime now = LocalDateTime.now();
