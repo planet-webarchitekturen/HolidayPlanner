@@ -81,15 +81,6 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @PatchMapping("/api/identity/users/{userId}/organization")
-    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication) or hasAnyRole('ADMIN')")
-    public ResponseEntity<UserResponse> updateOrganization(
-            @PathVariable("userId") UUID userId,
-            @RequestParam(value = "organizationId", required = false) UUID organizationId) {
-        User user = commandService.updateOrganization(userId, organizationId);
-        return ResponseEntity.ok(UserResponse.from(user));
-    }
-
     // --- FamilyMember Endpoints ---
 
     @GetMapping("/api/identity/users/{userId}/family-members")
