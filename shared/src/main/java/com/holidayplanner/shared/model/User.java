@@ -30,7 +30,8 @@ public class User {
     private String phoneNumber;
 
     // Reference to the organization this user is registered with
-    @Column(nullable = false)
+    // Can be null if the organization is deleted
+    @Column(nullable = true)
     private UUID organizationId;
 
     @Enumerated(EnumType.STRING)

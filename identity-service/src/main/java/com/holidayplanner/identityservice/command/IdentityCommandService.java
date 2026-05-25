@@ -6,6 +6,7 @@ import com.holidayplanner.shared.model.User;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
 import com.holidayplanner.shared.kafka.payload.UserPhoneUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserOrganizationUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import com.holidayplanner.identityservice.client.BookingServiceClient;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
@@ -111,6 +112,31 @@ public class IdentityCommandService {
         return saved;
     }
     //CHECK: Delete user? not in system operations
+
+    /**
+     * Update a user's organization. Can be set to null when the organization is deleted.
+     * 
+     * @param userId the user's ID
+     * @param organizationId the new organization ID (can be null)
+     * @return the updated User
+     * @throws RuntimeException if user not found
+     */
+    public User updateOrganization(UUID userId, UUID organizationId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        user.setOrganizationId(organizationId);
+        User saved = userRepository.save(user);
+        log.debug("User {} organization updated to {}", userId, organizationId);
+        
+        // Publish Kafka event
+        UserOrganizationUpdatedPayload payload = new UserOrganizationUpdatedPayload(
+                saved.getId(),
+                saved.getOrganizationId()
+        );
+        eventProducer.publishUserOrganizationUpdated(payload);
+        
+        return saved;
+    }
 
     // --- FamilyMember Operations ---
 

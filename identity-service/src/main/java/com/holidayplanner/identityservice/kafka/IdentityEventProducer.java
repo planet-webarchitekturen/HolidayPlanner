@@ -5,6 +5,7 @@ import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
 import com.holidayplanner.shared.kafka.payload.UserPhoneUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserOrganizationUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,20 @@ public class IdentityEventProducer {
                     payload.getUserId().toString(), json);
         } catch (Exception e) {
             log.error("Failed to publish FamilyMemberRemoved event", e);
+        }
+    }
+
+    public void publishUserOrganizationUpdated(UserOrganizationUpdatedPayload payload) {
+        try {
+            KafkaEnvelope<UserOrganizationUpdatedPayload> envelope = new KafkaEnvelope<>(
+                    "UserOrganizationUpdated", "1",
+                    LocalDateTime.now().toString(),
+                    "identity-service", payload);
+            String json = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send("holiday-planner.identity.user-organization-updated",
+                    payload.getUserId().toString(), json);
+        } catch (Exception e) {
+            log.error("Failed to publish UserOrganizationUpdated event", e);
         }
     }
 }
