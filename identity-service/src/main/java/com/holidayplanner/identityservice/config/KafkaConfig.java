@@ -55,7 +55,8 @@ public class KafkaConfig {
     /**
      * Topics produced by Identity Service
      */
-    //CHECK: Are these all the required topics? AI says no, but AI is not I
+    //CHECK: Are these all the required topics? There are more endpoints than this, but maybe they dont need the even/broadcast, just the return value?
+    //Also means we have only these topics in a bunch of other files and in the payloads in the shared module. 
     @Bean
     public NewTopic userRegisteredTopic() {
         return TopicBuilder.name("holiday-planner.identity.user-registered")

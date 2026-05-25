@@ -84,7 +84,6 @@ public class IdentityCommandService {
     }
 
     //CHECK: Do we only need this update or do other parameters also need to be updateable? not in system operations
-    //CHECK: Authentication is handled but we need to add authorization
     //CHECK: This is not in the system operations at all
     /**
      * Update a user's phone number.
@@ -115,7 +114,6 @@ public class IdentityCommandService {
 
     // --- FamilyMember Operations ---
 
-    //CHECK: Authentication is handled but we need to add authorization
     /**
      * Add a family member to a user's profile.
      * 
@@ -152,7 +150,7 @@ public class IdentityCommandService {
         
         return saved;
     }
-    //CHECK: Authentication is handled but we need to add authorization
+
     /**
      * Update a family member's information.
      * 
@@ -179,7 +177,7 @@ public class IdentityCommandService {
         return saved;
     }
 
-    //CHECK: Authentication is handled but we need to add authorization
+
     /**
      * Remove a family member from the system.
      * 

@@ -73,6 +73,7 @@ public class IdentityController {
 
 
     @PatchMapping("/api/identity/users/{userId}/phone")
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
     public ResponseEntity<UserResponse> updatePhone(
             @PathVariable("userId") UUID userId,
             @RequestParam("phoneNumber") String phoneNumber) {
@@ -83,11 +84,13 @@ public class IdentityController {
     // --- FamilyMember Endpoints ---
 
     @GetMapping("/api/identity/users/{userId}/family-members")
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
     public ResponseEntity<List<FamilyMember>> getFamilyMembers(@PathVariable("userId") UUID userId) {
         return ResponseEntity.ok(queryService.getFamilyMembers(userId));
     }
 
     @PostMapping("/api/identity/users/{userId}/family-members")
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
     public ResponseEntity<FamilyMember> addFamilyMember(
             @PathVariable("userId") UUID userId,
             @RequestParam("firstName") String firstName,
@@ -98,6 +101,7 @@ public class IdentityController {
     }
 
     @PutMapping("/api/identity/family-members/{memberId}")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication)")
     public ResponseEntity<FamilyMember> updateFamilyMember(
             @PathVariable("memberId") UUID memberId,
             @RequestParam("firstName") String firstName,
@@ -108,6 +112,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/owner-email")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
             @PathVariable("memberId") UUID memberId) {
         String email = queryService.getUserEmailByFamilyMemberId(memberId);
@@ -115,6 +120,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/display-name")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
@@ -122,6 +128,7 @@ public class IdentityController {
     }
 
     @DeleteMapping("/api/identity/family-members/{memberId}")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication)")
     public ResponseEntity<Void> removeFamilyMember(@PathVariable("memberId") UUID memberId) {
         commandService.removeFamilyMember(memberId);
         return ResponseEntity.noContent().build();
@@ -129,7 +136,9 @@ public class IdentityController {
 
     // --- Caregiver Endpoints ---
 
+    //CHECK: Can only Admins and event owners create caregivers? or anyone?
     @PostMapping("/api/identity/caregivers")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
     public ResponseEntity<Caregiver> createCaregiver(
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
@@ -139,11 +148,13 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/caregivers")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<List<Caregiver>> getAllCaregivers() {
         return ResponseEntity.ok(queryService.getAllCaregivers());
     }
 
     @GetMapping("/api/identity/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<Caregiver> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
         return ResponseEntity.ok(queryService.getCaregiverById(caregiverId));
     }

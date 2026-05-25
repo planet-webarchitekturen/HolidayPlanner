@@ -37,21 +37,4 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-
-    //CHECK: These methods are unusued - needed for missing auth? 
-    public Claims validateAndParseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-
-    public UUID getUserIdFromToken(String token) {
-        return UUID.fromString(validateAndParseClaims(token).getSubject());
-    }
-
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-    }
 }
