@@ -9,6 +9,7 @@ import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.eventservice.port.NotificationPort;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
+import com.holidayplanner.eventservice.saga.EventTermCancellationSaga;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
 import com.holidayplanner.shared.model.Event;
 import com.holidayplanner.shared.model.EventTerm;
@@ -44,6 +45,8 @@ class EventTermCommandServiceUnitTest {
     private BookingServicePort bookingServicePort;
     @Mock
     private NotificationPort notificationPort;
+    @Mock
+    private EventTermCancellationSaga eventTermCancellationSaga;
 
     @InjectMocks
     private EventTermCommandService commandService;
@@ -77,6 +80,7 @@ class EventTermCommandServiceUnitTest {
         commandService.changeEventTermStatus(termId, EventTermStatus.ACTIVE, CancellationActor.EVENT_OWNER);
 
         verify(eventTermEventPublisher, never()).publishEventTermCancelled(any());
+        verify(eventTermCancellationSaga, never()).start(any(), any());
     }
 
     @Test
@@ -90,15 +94,14 @@ class EventTermCommandServiceUnitTest {
     }
 
     @Test
-    void changeStatus_activeToCancelled_publishesKafka() {
+    void changeStatus_activeToCancelled_startsCancellationSaga() {
         term.setStatus(EventTermStatus.ACTIVE);
         when(eventTermRepository.findByIdWithEvent(termId)).thenReturn(Optional.of(term));
         when(eventTermRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         commandService.changeEventTermStatus(termId, EventTermStatus.CANCELLED, CancellationActor.EVENT_OWNER);
 
-        verify(eventTermEventPublisher).publishEventTermCancelled(argThat(p ->
-                "EVENT_OWNER".equals(p.getCancelledBy())));
+        verify(eventTermCancellationSaga).start(term, CancellationActor.EVENT_OWNER);
     }
 
     @Test
