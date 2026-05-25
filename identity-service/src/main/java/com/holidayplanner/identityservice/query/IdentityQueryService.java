@@ -3,16 +3,18 @@ package com.holidayplanner.identityservice.query;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
+import com.holidayplanner.identityservice.config.JwtTokenProvider;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
 import com.holidayplanner.identityservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-
+//CHECK: We have Authentication via Security Config but we need to add authorization
 /**
  * Query Service for Identity Service.
  * 
@@ -38,6 +40,9 @@ public class IdentityQueryService {
     private final UserRepository userRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final CaregiverRepository caregiverRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+
 
     /**
      * Fetch a user by ID.
@@ -51,6 +56,7 @@ public class IdentityQueryService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
     }
 
+    //CHECK: Not in System Operations BUT used in Login
     /**
      * Fetch a user by email.
      * 
@@ -86,6 +92,7 @@ public class IdentityQueryService {
                 .orElseThrow(() -> new RuntimeException("Caregiver not found: " + caregiverId));
     }
 
+    //CHECK: Not in System Operations
     /**
      * Fetch all caregivers in the system.
      * 
@@ -95,15 +102,40 @@ public class IdentityQueryService {
         return caregiverRepository.findAll();
     }
 
+    //CHECK: Not in System Operations
     public String getUserEmailByFamilyMemberId(UUID familyMemberId) {
         FamilyMember fm = familyMemberRepository.findById(familyMemberId)
                 .orElseThrow(() -> new RuntimeException("Family member not found: " + familyMemberId));
         return fm.getUser().getEmail();
     }
 
+    //CHECK: Not in System Operations
     public String getFamilyMemberDisplayName(UUID familyMemberId) {
         FamilyMember fm = familyMemberRepository.findById(familyMemberId)
                 .orElseThrow(() -> new RuntimeException("Family member not found: " + familyMemberId));
         return fm.getFirstName() + " " + fm.getLastName();
+    }
+
+    /**
+     * Authenticate user and generate JWT token.
+     * 
+     * This is a read operation in CQRS (it doesn't modify state, only looks up the user),
+     * though the JWT generation is a side effect. Kept here with QueryService for simplicity.
+     * 
+     * @param email the user's email
+     * @param password the user's plaintext password
+     * @return JWT token
+     * @throws RuntimeException if user not found or password is invalid
+     */
+    public String loginUser(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        List<String> roles = List.of(user.getRole().toString());
+        return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
     }
 }

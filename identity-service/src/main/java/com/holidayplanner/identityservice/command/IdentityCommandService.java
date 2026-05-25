@@ -3,14 +3,15 @@ package com.holidayplanner.identityservice.command;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
+import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
+import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
+import com.holidayplanner.shared.kafka.payload.UserPhoneUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
+import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
 import com.holidayplanner.identityservice.repository.UserRepository;
-import com.holidayplanner.identityservice.event.DomainEventPublisher;
-import com.holidayplanner.identityservice.event.UserRegisteredEvent;
-import com.holidayplanner.identityservice.event.UserPhoneUpdatedEvent;
-import com.holidayplanner.identityservice.event.FamilyMemberAddedEvent;
-import com.holidayplanner.identityservice.event.FamilyMemberRemovedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,17 +24,10 @@ import java.util.UUID;
 /**
  * Command Service for Identity Service.
  * 
- * Handles all write operations (commands):
+ * Handles all WRITE operations (commands):
  * - User registration and updates
  * - Family member creation, updates, and deletion
  * - Caregiver management
- * 
- * Commands modify state and should be transactional.
- * They are separated from queries (IdentityQueryService) following CQRS pattern,
- * allowing each to be optimized independently.
- * 
- * In the future, this service will publish Kafka events (e.g., identity.user.registered)
- * to trigger side effects in other services.
  */
 @Slf4j
 @Service
@@ -44,8 +38,13 @@ public class IdentityCommandService {
     private final FamilyMemberRepository familyMemberRepository;
     private final CaregiverRepository caregiverRepository;
     private final PasswordEncoder passwordEncoder;
-    private final DomainEventPublisher eventPublisher;
+    private final IdentityEventProducer eventProducer;
+    private final BookingServiceClient bookingServiceClient;
 
+
+
+
+    // --- User Operations ---
     /**
      * Register a new user in the system.
      * 
@@ -71,18 +70,22 @@ public class IdentityCommandService {
         User saved = userRepository.save(user);
         log.info("User registered: {} for organization {}", email, organizationId);
         
-        // Publish domain event
-        UserRegisteredEvent event = new UserRegisteredEvent(
+        // Publish Kafka event
+        UserRegisteredPayload payload = new UserRegisteredPayload(
                 saved.getId(),
                 saved.getEmail(),
+                saved.getPhoneNumber(),
                 saved.getOrganizationId(),
-                Instant.now()
+                saved.getRole()
         );
-        eventPublisher.publishUserRegistered(event);
+        eventProducer.publishUserRegistered(payload);
         
         return saved;
     }
 
+    //CHECK: Do we only need this update or do other parameters also need to be updateable? not in system operations
+    //CHECK: Authentication is handled but we need to add authorization
+    //CHECK: This is not in the system operations at all
     /**
      * Update a user's phone number.
      * 
@@ -98,17 +101,21 @@ public class IdentityCommandService {
         User saved = userRepository.save(user);
         log.debug("User {} phone number updated", userId);
         
-        // Publish domain event
-        UserPhoneUpdatedEvent event = new UserPhoneUpdatedEvent(
+        // Publish Kafka event
+        //can't return the result directly because we dont want to hand of the password hash back to the user
+        UserPhoneUpdatedPayload payload = new UserPhoneUpdatedPayload(
                 saved.getId(),
-                saved.getPhoneNumber(),
-                Instant.now()
+                saved.getPhoneNumber()
         );
-        eventPublisher.publishUserPhoneUpdated(event);
+        eventProducer.publishUserPhoneUpdated(payload);
         
         return saved;
     }
+    //CHECK: Delete user? not in system operations
 
+    // --- FamilyMember Operations ---
+
+    //CHECK: Authentication is handled but we need to add authorization
     /**
      * Add a family member to a user's profile.
      * 
@@ -135,21 +142,17 @@ public class IdentityCommandService {
         FamilyMember saved = familyMemberRepository.save(member);
         log.info("Family member {} {} added to user {}", firstName, lastName, userId);
         
-        // Publish domain event
-        FamilyMemberAddedEvent event = new FamilyMemberAddedEvent(
-                saved.getId(),
+        // Publish Kafka event
+        FamilyMemberAddedPayload payload = new FamilyMemberAddedPayload(
                 userId,
-                firstName,
-                lastName,
-                birthDate,
-                zip,
-                Instant.now()
+                saved.getId(),
+                firstName + " " + lastName
         );
-        eventPublisher.publishFamilyMemberAdded(event);
+        eventProducer.publishFamilyMemberAdded(payload);
         
         return saved;
     }
-
+    //CHECK: Authentication is handled but we need to add authorization
     /**
      * Update a family member's information.
      * 
@@ -176,21 +179,27 @@ public class IdentityCommandService {
         return saved;
     }
 
+    //CHECK: Authentication is handled but we need to add authorization
     /**
      * Remove a family member from the system.
      * 
-     * IMPORTANT: In production, this should check with booking-service to ensure
-     * the family member has no active bookings before deletion. For now, deletion is allowed.
+     * Pre-condition: Family member has no active bookings (checked via booking-service).
+     * If active bookings exist, deletion is rejected to maintain data consistency.
      * 
      * @param memberId the family member's ID
      * @throws RuntimeException if family member not found
+     * @throws RuntimeException if family member has active bookings
      */
     public void removeFamilyMember(UUID memberId) {
         FamilyMember member = familyMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("FamilyMember not found: " + memberId));
         
-        // TODO: Check with booking-service: hasActiveBookings(memberId)
-        // If true, reject deletion to maintain data consistency
+        // Veto check: ensure no active bookings exist for this family member
+        long activeBookingCount = bookingServiceClient.getActiveBookingCount(memberId);
+        if (activeBookingCount > 0) {
+            throw new RuntimeException("Cannot remove family member with active bookings. " +
+                    "Cancel all bookings first (" + activeBookingCount + " active bookings found)");
+        }
         
         String firstName = member.getFirstName();
         String lastName = member.getLastName();
@@ -199,16 +208,15 @@ public class IdentityCommandService {
         familyMemberRepository.deleteById(memberId);
         log.info("Family member {} removed", memberId);
         
-        // Publish domain event
-        FamilyMemberRemovedEvent event = new FamilyMemberRemovedEvent(
-                memberId,
+        // Publish Kafka event
+        FamilyMemberRemovedPayload payload = new FamilyMemberRemovedPayload(
                 userId,
-                firstName,
-                lastName,
-                Instant.now()
+                memberId
         );
-        eventPublisher.publishFamilyMemberRemoved(event);
+        eventProducer.publishFamilyMemberRemoved(payload);
     }
+
+    // --- Caregiver Operations ---
 
     /**
      * Create a new caregiver in the system.
@@ -236,4 +244,6 @@ public class IdentityCommandService {
         log.info("Caregiver created: {} {}", firstName, lastName);
         return saved;
     }
+
+    //CHECK: update/remove cargiver? Not in system operations
 }

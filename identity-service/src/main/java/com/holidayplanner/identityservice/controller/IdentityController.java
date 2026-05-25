@@ -4,10 +4,8 @@ import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
 import com.holidayplanner.identityservice.command.IdentityCommandService;
-import com.holidayplanner.identityservice.composition.IdentityCompositionService;
 import com.holidayplanner.identityservice.dto.*;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
-import com.holidayplanner.identityservice.service.IdentityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +21,6 @@ import java.util.UUID;
  * Routes requests to appropriate services following CQRS pattern:
  * - POST/PATCH/DELETE endpoints → IdentityCommandService (write operations)
  * - GET endpoints → IdentityQueryService (read operations)
- * - Composition GET endpoints → IdentityCompositionService (enriched reads)
  */
 @RestController
 @RequiredArgsConstructor
@@ -31,8 +28,6 @@ public class IdentityController {
 
     private final IdentityCommandService commandService;
     private final IdentityQueryService queryService;
-    private final IdentityCompositionService compositionService;
-    private final IdentityService identityService;
 
     // --- Health Check ---
     @GetMapping("/api/identity/health")
@@ -52,10 +47,10 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
+    @PostMapping({"​/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
-        String token = identityService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
+        String token = queryService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
         User user = queryService.getUserByEmail(loginRequest.getEmail());
         return ResponseEntity.ok(new LoginResponse(
                 user.getId(),
@@ -76,10 +71,6 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @GetMapping("/api/identity/users/{userId}/profile")
-    public ResponseEntity<UserProfileEnrichedResponse> getUserProfile(@PathVariable("userId") UUID userId) {
-        return ResponseEntity.ok(compositionService.getUserProfileEnriched(userId));
-    }
 
     @PatchMapping("/api/identity/users/{userId}/phone")
     public ResponseEntity<UserResponse> updatePhone(

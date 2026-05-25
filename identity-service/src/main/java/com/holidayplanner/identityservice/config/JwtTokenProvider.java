@@ -37,6 +37,8 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+
+    //CHECK: These methods are unusued - needed for missing auth? 
     public Claims validateAndParseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
