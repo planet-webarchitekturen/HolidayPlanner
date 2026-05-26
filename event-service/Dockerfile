@@ -11,6 +11,7 @@ COPY identity-service/pom.xml identity-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
 COPY organization-service/pom.xml organization-service/pom.xml
 COPY payment-service/pom.xml payment-service/pom.xml
+COPY e2e-tests/pom.xml e2e-tests/pom.xml
 COPY shared/src shared/src
 COPY event-service/src event-service/src
 RUN mvn install -N -DskipTests && \

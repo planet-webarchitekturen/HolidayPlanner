@@ -13,6 +13,7 @@ COPY identity-service/pom.xml identity-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
 COPY organization-service/pom.xml organization-service/pom.xml
 COPY payment-service/pom.xml payment-service/pom.xml
+COPY e2e-tests/pom.xml e2e-tests/pom.xml
 # Only copy source for the modules we actually compile
 COPY shared/src shared/src
 COPY booking-service/src booking-service/src
