@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
-import com.holidayplanner.shared.kafka.payload.UserPhoneUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserDeletedPayload;
+import com.holidayplanner.shared.kafka.payload.UserUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,17 +36,31 @@ public class IdentityEventProducer {
         }
     }
 
-    public void publishUserPhoneUpdated(UserPhoneUpdatedPayload payload) {
+    public void publishUserUpdated(UserUpdatedPayload payload) {
         try {
-            KafkaEnvelope<UserPhoneUpdatedPayload> envelope = new KafkaEnvelope<>(
-                    "UserPhoneUpdated", "1",
+            KafkaEnvelope<UserUpdatedPayload> envelope = new KafkaEnvelope<>(
+                    "UserUpdated", "1",
                     LocalDateTime.now().toString(),
                     "identity-service", payload);
             String json = objectMapper.writeValueAsString(envelope);
-            kafkaTemplate.send("holiday-planner.identity.user-phone-updated",
+            kafkaTemplate.send("holiday-planner.identity.user-updated",
                     payload.getUserId().toString(), json);
         } catch (Exception e) {
-            log.error("Failed to publish UserPhoneUpdated event", e);
+            log.error("Failed to publish UserUpdated event", e);
+        }
+    }
+
+    public void publishUserDeleted(UserDeletedPayload payload) {
+        try {
+            KafkaEnvelope<UserDeletedPayload> envelope = new KafkaEnvelope<>(
+                    "UserDeleted", "1",
+                    LocalDateTime.now().toString(),
+                    "identity-service", payload);
+            String json = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send("holiday-planner.identity.user-deleted",
+                    payload.getUserId().toString(), json);
+        } catch (Exception e) {
+            log.error("Failed to publish UserDeleted event", e);
         }
     }
 

@@ -3,9 +3,11 @@ package com.holidayplanner.identityservice.command;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
+import com.holidayplanner.shared.model.UserRole;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
 import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
-import com.holidayplanner.shared.kafka.payload.UserPhoneUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserDeletedPayload;
+import com.holidayplanner.shared.kafka.payload.UserUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import com.holidayplanner.identityservice.client.BookingServiceClient;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
@@ -83,34 +85,97 @@ public class IdentityCommandService {
         return saved;
     }
 
-    //CHECK: Do we only need this update or do other parameters also need to be updateable? not in system operations
-    //CHECK: This is not in the system operations at all
     /**
-     * Update a user's phone number.
-     * 
+     * Update a user's profile.
+     *
+     * Partial update: any argument left null is left unchanged. Email is re-checked
+     * for uniqueness, the password is re-hashed, and {@code role}/{@code organizationId}
+     * are administrative fields (authorization is enforced in the controller layer).
+     *
      * @param userId the user's ID
-     * @param phoneNumber the new phone number
+     * @param email new email, or null to keep the current one
+     * @param phoneNumber new phone number, or null to keep the current one
+     * @param password new plaintext password, or null to keep the current one
+     * @param role new role, or null to keep the current one
+     * @param organizationId new organization, or null to keep the current one
      * @return the updated User
-     * @throws RuntimeException if user not found
+     * @throws RuntimeException if user not found, or if the new email is already in use
      */
-    public User updatePhoneNumber(UUID userId, String phoneNumber) {
+    public User updateUser(UUID userId, String email, String phoneNumber,
+                           String password, UserRole role, UUID organizationId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        user.setPhoneNumber(phoneNumber);
+
+        if (email != null && !email.equals(user.getEmail())) {
+            if (userRepository.existsByEmail(email)) {
+                throw new RuntimeException("User already exists with email: " + email);
+            }
+            user.setEmail(email);
+        }
+        if (phoneNumber != null) {
+            user.setPhoneNumber(phoneNumber);
+        }
+        if (password != null) {
+            user.setPasswordHash(passwordEncoder.encode(password));
+        }
+        if (role != null) {
+            user.setRole(role);
+        }
+        if (organizationId != null) {
+            user.setOrganizationId(organizationId);
+        }
+
         User saved = userRepository.save(user);
-        log.debug("User {} phone number updated", userId);
-        
-        // Publish Kafka event
-        //can't return the result directly because we dont want to hand of the password hash back to the user
-        UserPhoneUpdatedPayload payload = new UserPhoneUpdatedPayload(
+        log.info("User {} updated", userId);
+
+        // Publish Kafka event.
+        // We don't return the entity directly to consumers because we never want to
+        // expose the password hash; the event carries only the public profile fields.
+        UserUpdatedPayload payload = new UserUpdatedPayload(
                 saved.getId(),
+                saved.getEmail(),
                 saved.getPhoneNumber()
         );
-        eventProducer.publishUserPhoneUpdated(payload);
-        
+        eventProducer.publishUserUpdated(payload);
+
         return saved;
     }
-    //CHECK: Delete user? not in system operations
+
+    /**
+     * Delete a user and their family members.
+     *
+     * Pre-condition: none of the user's family members have active bookings
+     * (checked via booking-service, mirroring {@link #removeFamilyMember(UUID)}).
+     * Deleting the user cascades to their family members (orphanRemoval).
+     *
+     * @param userId the user's ID
+     * @throws RuntimeException if user not found
+     * @throws RuntimeException if any family member has active bookings
+     */
+    public void deleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        // Veto check: ensure no family member has active bookings before cascading the delete
+        for (FamilyMember member : familyMemberRepository.findByUser_Id(userId)) {
+            long activeBookingCount = bookingServiceClient.getActiveBookingCount(member.getId());
+            if (activeBookingCount > 0) {
+                throw new RuntimeException("Cannot delete user with family members that have active bookings. " +
+                        "Cancel all bookings first (" + activeBookingCount + " active bookings found for member " +
+                        member.getId() + ")");
+            }
+        }
+
+        String email = user.getEmail();
+        UUID organizationId = user.getOrganizationId();
+
+        userRepository.delete(user);
+        log.info("User {} deleted", userId);
+
+        // Publish Kafka event
+        UserDeletedPayload payload = new UserDeletedPayload(userId, email, organizationId);
+        eventProducer.publishUserDeleted(payload);
+    }
 
     // --- FamilyMember Operations ---
 
@@ -243,5 +308,46 @@ public class IdentityCommandService {
         return saved;
     }
 
-    //CHECK: update/remove cargiver? Not in system operations
+    /**
+     * Update a caregiver's information.
+     *
+     * @param caregiverId the caregiver's ID
+     * @param firstName new first name
+     * @param lastName new last name
+     * @param email new email (must remain unique)
+     * @param phoneNumber new phone number
+     * @return the updated Caregiver
+     * @throws RuntimeException if caregiver not found, or if the new email is already in use
+     */
+    public Caregiver updateCaregiver(UUID caregiverId, String firstName, String lastName,
+                                     String email, String phoneNumber) {
+        Caregiver caregiver = caregiverRepository.findById(caregiverId)
+                .orElseThrow(() -> new RuntimeException("Caregiver not found: " + caregiverId));
+
+        if (!email.equals(caregiver.getEmail()) && caregiverRepository.existsByEmail(email)) {
+            throw new RuntimeException("Caregiver already exists with email: " + email);
+        }
+
+        caregiver.setFirstName(firstName);
+        caregiver.setLastName(lastName);
+        caregiver.setEmail(email);
+        caregiver.setPhoneNumber(phoneNumber);
+
+        Caregiver saved = caregiverRepository.save(caregiver);
+        log.info("Caregiver {} updated", caregiverId);
+        return saved;
+    }
+
+    /**
+     * Delete a caregiver from the system.
+     *
+     * @param caregiverId the caregiver's ID
+     * @throws RuntimeException if caregiver not found
+     */
+    public void deleteCaregiver(UUID caregiverId) {
+        Caregiver caregiver = caregiverRepository.findById(caregiverId)
+                .orElseThrow(() -> new RuntimeException("Caregiver not found: " + caregiverId));
+        caregiverRepository.delete(caregiver);
+        log.info("Caregiver {} deleted", caregiverId);
+    }
 }

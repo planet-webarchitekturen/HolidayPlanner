@@ -9,7 +9,8 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserPhoneUpdatedPayload {
+public class UserUpdatedPayload {
     private UUID userId;
+    private String email;
     private String phoneNumber;
 }

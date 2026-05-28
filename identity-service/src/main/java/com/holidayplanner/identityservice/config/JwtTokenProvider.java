@@ -37,4 +37,8 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
 }

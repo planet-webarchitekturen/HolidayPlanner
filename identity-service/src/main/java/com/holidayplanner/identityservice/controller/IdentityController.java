@@ -64,6 +64,15 @@ public class IdentityController {
 
     // --- User Endpoints ---
 
+    @GetMapping("/api/identity/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        List<UserResponse> users = queryService.getAllUsers().stream()
+                .map(UserResponse::from)
+                .toList();
+        return ResponseEntity.ok(users);
+    }
+
     @GetMapping("/api/identity/users/{userId}")
     @PreAuthorize("hasAnyRole('USER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'EVENT_OWNER', 'ACCOUNTANT')")
     public ResponseEntity<UserResponse> getUser(@PathVariable("userId") UUID userId) {
@@ -71,14 +80,21 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-
-    @PatchMapping("/api/identity/users/{userId}/phone")
-    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
-    public ResponseEntity<UserResponse> updatePhone(
+    @PatchMapping("/api/identity/users/{userId}")
+    @PreAuthorize("@identitySecurity.canUpdateUser(#userId, #request, authentication)")
+    public ResponseEntity<UserResponse> updateUser(
             @PathVariable("userId") UUID userId,
-            @RequestParam("phoneNumber") String phoneNumber) {
-        User user = commandService.updatePhoneNumber(userId, phoneNumber);
+            @RequestBody UpdateUserRequest request) {
+        User user = commandService.updateUser(userId, request.getEmail(), request.getPhoneNumber(),
+                request.getPassword(), request.getRole(), request.getOrganizationId());
         return ResponseEntity.ok(UserResponse.from(user));
+    }
+
+    @DeleteMapping("/api/identity/users/{userId}")
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication) or hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteUser(@PathVariable("userId") UUID userId) {
+        commandService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
     }
 
     // --- FamilyMember Endpoints ---
@@ -98,6 +114,12 @@ public class IdentityController {
             @RequestParam("birthDate") LocalDate birthDate,
             @RequestParam("zip") String zip) {
         return ResponseEntity.ok(commandService.addFamilyMember(userId, firstName, lastName, birthDate, zip));
+    }
+
+    @GetMapping("/api/identity/family-members/{memberId}")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    public ResponseEntity<FamilyMember> getFamilyMember(@PathVariable("memberId") UUID memberId) {
+        return ResponseEntity.ok(queryService.getFamilyMemberById(memberId));
     }
 
     @PutMapping("/api/identity/family-members/{memberId}")
@@ -157,5 +179,23 @@ public class IdentityController {
     @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<Caregiver> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
         return ResponseEntity.ok(queryService.getCaregiverById(caregiverId));
+    }
+
+    @PutMapping("/api/identity/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
+    public ResponseEntity<Caregiver> updateCaregiver(
+            @PathVariable("caregiverId") UUID caregiverId,
+            @RequestParam("firstName") String firstName,
+            @RequestParam("lastName") String lastName,
+            @RequestParam("email") String email,
+            @RequestParam("phoneNumber") String phoneNumber) {
+        return ResponseEntity.ok(commandService.updateCaregiver(caregiverId, firstName, lastName, email, phoneNumber));
+    }
+
+    @DeleteMapping("/api/identity/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
+    public ResponseEntity<Void> deleteCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
+        commandService.deleteCaregiver(caregiverId);
+        return ResponseEntity.noContent().build();
     }
 }

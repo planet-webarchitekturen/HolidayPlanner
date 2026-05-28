@@ -30,7 +30,8 @@ import java.util.Map;
  * 
  * Topics Created:
  * - holiday-planner.identity.user-registered (from registerUser)
- * - holiday-planner.identity.user-phone-updated (from updatePhoneNumber)
+ * - holiday-planner.identity.user-updated (from updateUser)
+     * - holiday-planner.identity.user-deleted (from deleteUser)
  * - holiday-planner.identity.family-member-added (from addFamilyMember)
  * - holiday-planner.identity.family-member-removed (from removeFamilyMember)
  */
@@ -66,8 +67,16 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic userPhoneUpdatedTopic() {
-        return TopicBuilder.name("holiday-planner.identity.user-phone-updated")
+    public NewTopic userUpdatedTopic() {
+        return TopicBuilder.name("holiday-planner.identity.user-updated")
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic userDeletedTopic() {
+        return TopicBuilder.name("holiday-planner.identity.user-deleted")
                 .partitions(3)
                 .replicas(1)
                 .build();

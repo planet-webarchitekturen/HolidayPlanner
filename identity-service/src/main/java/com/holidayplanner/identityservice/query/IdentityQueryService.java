@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-//CHECK: We have Authentication via Security Config but we need to add authorization
+
 /**
  * Query Service for Identity Service.
  * 
@@ -56,6 +56,15 @@ public class IdentityQueryService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
     }
 
+    /**
+     * Fetch all users in the system (admin operation).
+     *
+     * @return list of all Users
+     */
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
     //CHECK: Not in System Operations BUT used in Login
     /**
      * Fetch a user by email.
@@ -78,6 +87,18 @@ public class IdentityQueryService {
     public List<FamilyMember> getFamilyMembers(UUID userId) {
         log.debug("Fetching family members for user {}", userId);
         return familyMemberRepository.findByUser_Id(userId);
+    }
+
+    /**
+     * Fetch a single family member by ID.
+     *
+     * @param memberId the family member's ID
+     * @return the FamilyMember
+     * @throws RuntimeException if family member not found
+     */
+    public FamilyMember getFamilyMemberById(UUID memberId) {
+        return familyMemberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("FamilyMember not found: " + memberId));
     }
 
     /**
