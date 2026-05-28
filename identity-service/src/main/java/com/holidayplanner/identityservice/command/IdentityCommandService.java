@@ -18,21 +18,25 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.Instant;
 import java.util.UUID;
 
 /**
  * Command Service for Identity Service.
- * 
+ *
  * Handles all WRITE operations (commands):
  * - User registration and updates
  * - Family member creation, updates, and deletion
  * - Caregiver management
+ *
+ * Every command runs in a transaction: the aggregate change and the outbox row
+ * carrying its domain event commit together (transactional outbox pattern).
  */
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class IdentityCommandService {
 
