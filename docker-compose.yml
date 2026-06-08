@@ -81,11 +81,8 @@ services:
         condition: service_healthy
 
   booking-service:
-    build:
-      context: .
-      dockerfile: booking-service/Dockerfile
-    image: holidayplanner/booking-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/booking-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8082:8082"
@@ -109,11 +106,8 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   event-service:
-    build:
-      context: .
-      dockerfile: event-service/Dockerfile
-    image: holidayplanner/event-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/event-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8081:8081"
@@ -136,11 +130,8 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8083
 
   identity-service:
-    build:
-      context: .
-      dockerfile: identity-service/Dockerfile
-    image: holidayplanner/identity-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/identity-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8083:8083"
@@ -161,11 +152,8 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:8082
 
   organization-service:
-    build:
-      context: .
-      dockerfile: organization-service/Dockerfile
-    image: holidayplanner/organization-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/organization-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8084:8084"
@@ -186,11 +174,8 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8083
 
   payment-service:
-    build:
-      context: .
-      dockerfile: payment-service/Dockerfile
-    image: holidayplanner/payment-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/payment-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8085:8085"
@@ -211,11 +196,8 @@ services:
       SERVICES_BOOKING_SERVICE_URL: http://booking-service:8082
 
   notification-service:
-    build:
-      context: .
-      dockerfile: notification-service/Dockerfile
-    image: holidayplanner/notification-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/notification-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8090:8089"
@@ -232,11 +214,8 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   booklet-service:
-    build:
-      context: .
-      dockerfile: booklet-service/Dockerfile
-    image: holidayplanner/booklet-service:local
-    pull_policy: build
+    image: ghcr.io/planet-webarchitekturen/booklet-service:${IMAGE_TAG:-latest}
+    pull_policy: always
     <<: *default-logging
     ports:
       - "8087:8087"

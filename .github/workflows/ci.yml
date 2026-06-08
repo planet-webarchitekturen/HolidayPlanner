@@ -1,17 +1,59 @@
 name: CI
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: planet-webarchitekturen
+
 jobs:
-  build:
+  docker:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: booking-service
+            dockerfile: booking-service/Dockerfile
+          - service: event-service
+            dockerfile: event-service/Dockerfile
+          - service: identity-service
+            dockerfile: identity-service/Dockerfile
+          - service: organization-service
+            dockerfile: organization-service/Dockerfile
+          - service: payment-service
+            dockerfile: payment-service/Dockerfile
+          - service: notification-service
+            dockerfile: notification-service/Dockerfile
+          - service: booklet-service
+            dockerfile: booklet-service/Dockerfile
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
         with:
-          java-version: '21'
-          distribution: 'temurin'
-      - name: Build and compile
-        run: mvn clean compile -DskipTests
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}:sha-${{ github.sha }}
