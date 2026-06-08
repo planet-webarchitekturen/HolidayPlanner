@@ -5,6 +5,7 @@ import com.holidayplanner.identityservice.command.IdentityCommandService;
 import com.holidayplanner.identityservice.dto.*;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -42,10 +43,10 @@ public class IdentityController {
             @RequestParam("phoneNumber") String phoneNumber,
             @RequestParam("organizationId") UUID organizationId) {
         User user = commandService.registerUser(email, password, phoneNumber, organizationId);
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
     }
 
-    @PostMapping({"​/api/auth/login", "/api/identity/auth/login"})
+    @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
         String token = queryService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
