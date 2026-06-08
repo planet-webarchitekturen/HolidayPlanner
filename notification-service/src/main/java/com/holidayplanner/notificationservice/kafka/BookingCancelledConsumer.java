@@ -25,10 +25,25 @@ public class BookingCancelledConsumer {
                     message,
                     new TypeReference<KafkaEnvelope<BookingCancelledPayload>>() {});
             BookingCancelledPayload payload = envelope.getPayload();
-            notificationService.notifyBookingCancelledByOwner(
-                    payload.getParentEmail(),
-                    payload.getEventName(),
-                    payload.getTermDate());
+            String cancelledBy = payload.getCancelledBy();
+            if ("EVENT_OWNER".equalsIgnoreCase(cancelledBy) || "event-owner".equalsIgnoreCase(cancelledBy)) {
+                notificationService.notifyBookingCancelledByOwner(
+                        payload.getParentEmail(),
+                        payload.getEventName(),
+                        payload.getTermDate());
+            } else if ("TERM_CANCELLED".equalsIgnoreCase(cancelledBy) || "term-cancelled".equalsIgnoreCase(cancelledBy)) {
+                notificationService.notifyTermCancelled(
+                        payload.getParentEmail(),
+                        payload.getEventName(),
+                        payload.getTermDate());
+            } else if ("USER".equalsIgnoreCase(cancelledBy) || "PARENT".equalsIgnoreCase(cancelledBy)) {
+                notificationService.notifyBookingCancelledByUser(
+                        payload.getParentEmail(),
+                        payload.getEventName(),
+                        payload.getTermDate());
+            } else {
+                log.warn("Ignoring BookingCancelled event with unsupported cancelledBy: {}", cancelledBy);
+            }
         } catch (Exception e) {
             log.error("Failed to process BookingCancelled event: {}", e.getMessage());
         }

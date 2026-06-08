@@ -10,11 +10,10 @@ import com.holidayplanner.eventservice.dto.EventTermResponse;
 import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.eventservice.port.NotificationPort;
-import com.holidayplanner.eventservice.repository.CaregiverRepository;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
+import com.holidayplanner.eventservice.saga.EventTermCancellationSaga;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
-import com.holidayplanner.shared.kafka.payload.EventTermCancelledPayload;
 import com.holidayplanner.shared.model.Event;
 import com.holidayplanner.shared.model.EventTerm;
 import com.holidayplanner.shared.model.EventTermStatus;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,10 +33,10 @@ public class EventTermCommandService {
 
     private final EventTermRepository eventTermRepository;
     private final EventRepository eventRepository;
-    private final CaregiverRepository caregiverRepository;
     private final EventTermEventPublisher eventTermEventPublisher;
     private final BookingServicePort bookingServicePort;
     private final NotificationPort notificationPort;
+    private final EventTermCancellationSaga eventTermCancellationSaga;
 
     public EventTermResponse createEventTerm(UUID eventId, CreateEventTermRequest request) {
         Event event = eventRepository.findById(eventId)
@@ -66,21 +64,7 @@ public class EventTermCommandService {
         EventTerm saved = eventTermRepository.save(term);
 
         if (newStatus == EventTermStatus.CANCELLED) {
-            List<String> caregiverEmails = term.getCaregiverIds().stream()
-                    .map(id -> caregiverRepository.findById(id)
-                            .map(c -> c.getEmail())
-                            .orElse(null))
-                    .filter(email -> email != null)
-                    .collect(Collectors.toList());
-            String cancelledBy = actor == CancellationActor.SYSTEM ? "SYSTEM" : "EVENT_OWNER";
-            EventTermCancelledPayload payload = new EventTermCancelledPayload(
-                    term.getId(),
-                    term.getEvent() != null ? term.getEvent().getShortTitle() : null,
-                    term.getStartDateTime() != null ? term.getStartDateTime().toString() : null,
-                    term.getEvent() != null ? term.getEvent().getOrganizationId() : null,
-                    caregiverEmails,
-                    cancelledBy);
-            eventTermEventPublisher.publishEventTermCancelled(payload);
+            eventTermCancellationSaga.start(term, actor);
         }
         return EventTermResponse.from(saved);
     }

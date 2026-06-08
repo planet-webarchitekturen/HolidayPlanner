@@ -25,10 +25,19 @@ public class BookingCreatedConsumer {
                     message,
                     new TypeReference<KafkaEnvelope<BookingCreatedPayload>>() {});
             BookingCreatedPayload payload = envelope.getPayload();
-            notificationService.notifyBookingConfirmed(
-                    payload.getParentEmail(),
-                    payload.getEventName(),
-                    payload.getTermDate());
+            if ("CONFIRMED".equalsIgnoreCase(payload.getStatus())) {
+                notificationService.notifyBookingConfirmed(
+                        payload.getParentEmail(),
+                        payload.getEventName(),
+                        payload.getTermDate());
+            } else if ("WAITLISTED".equalsIgnoreCase(payload.getStatus())) {
+                notificationService.notifyBookingWaitlisted(
+                        payload.getParentEmail(),
+                        payload.getEventName(),
+                        payload.getTermDate());
+            } else {
+                log.warn("Ignoring BookingCreated event with unsupported status: {}", payload.getStatus());
+            }
         } catch (Exception e) {
             log.error("Failed to process BookingCreated event: {}", e.getMessage());
         }

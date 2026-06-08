@@ -28,7 +28,6 @@ services:
 
   kafka:
     image: public.ecr.aws/bitnami/kafka:4.2.0
-    platform: linux/amd64
     <<: *default-logging
     deploy:
       resources:
@@ -85,7 +84,8 @@ services:
     build:
       context: .
       dockerfile: booking-service/Dockerfile
-    image: muhiguezel/booking-service:latest
+    image: holidayplanner/booking-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8082:8082"
@@ -112,7 +112,8 @@ services:
     build:
       context: .
       dockerfile: event-service/Dockerfile
-    image: muhiguezel/event-service:latest
+    image: holidayplanner/event-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8081:8081"
@@ -138,7 +139,8 @@ services:
     build:
       context: .
       dockerfile: identity-service/Dockerfile
-    image: muhiguezel/identity-service:latest
+    image: holidayplanner/identity-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8083:8083"
@@ -162,7 +164,8 @@ services:
     build:
       context: .
       dockerfile: organization-service/Dockerfile
-    image: muhiguezel/organization-service:latest
+    image: holidayplanner/organization-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8084:8084"
@@ -186,7 +189,8 @@ services:
     build:
       context: .
       dockerfile: payment-service/Dockerfile
-    image: muhiguezel/payment-service:latest
+    image: holidayplanner/payment-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8085:8085"
@@ -210,7 +214,8 @@ services:
     build:
       context: .
       dockerfile: notification-service/Dockerfile
-    image: muhiguezel/notification-service:latest
+    image: holidayplanner/notification-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8090:8089"
@@ -230,7 +235,8 @@ services:
     build:
       context: .
       dockerfile: booklet-service/Dockerfile
-    image: muhiguezel/booklet-service:latest
+    image: holidayplanner/booklet-service:local
+    pull_policy: build
     <<: *default-logging
     ports:
       - "8087:8087"

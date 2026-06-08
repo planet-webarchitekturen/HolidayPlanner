@@ -17,16 +17,11 @@ public class NotificationService {
 
     // Send a single email
     public void sendEmail(String to, String subject, String body) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(body);
-            mailSender.send(message);
-            log.info("Email sent to {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
-        }
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+        log.info("Email delivery disabled; would send email to {} with subject '{}'", to, subject);
     }
 
     // Send bulk emails to multiple recipients
@@ -40,6 +35,15 @@ public class NotificationService {
         String subject = "Booking Confirmed – " + eventName;
         String body = String.format(
                 "Your booking for \"%s\" on %s has been confirmed!\n\nHoliday Planner Team",
+                eventName, termDate);
+        sendEmail(parentEmail, subject, body);
+    }
+
+    // Notify parent that booking is on the waiting list
+    public void notifyBookingWaitlisted(String parentEmail, String eventName, String termDate) {
+        String subject = "Booking Waitlisted – " + eventName;
+        String body = String.format(
+                "Your booking for \"%s\" on %s is on the waiting list.\n\nHoliday Planner Team",
                 eventName, termDate);
         sendEmail(parentEmail, subject, body);
     }
@@ -58,6 +62,15 @@ public class NotificationService {
         String subject = "Your Booking Was Cancelled – " + eventName;
         String body = String.format(
                 "Your booking for \"%s\" on %s has been cancelled by the event owner.\n\nHoliday Planner Team",
+                eventName, termDate);
+        sendEmail(parentEmail, subject, body);
+    }
+
+    // Notify parent that their own cancellation was recorded
+    public void notifyBookingCancelledByUser(String parentEmail, String eventName, String termDate) {
+        String subject = "Booking Cancelled – " + eventName;
+        String body = String.format(
+                "Your cancellation for \"%s\" on %s has been recorded.\n\nHoliday Planner Team",
                 eventName, termDate);
         sendEmail(parentEmail, subject, body);
     }

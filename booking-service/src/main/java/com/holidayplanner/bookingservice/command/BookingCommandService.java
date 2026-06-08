@@ -60,17 +60,15 @@ public class BookingCommandService {
 
         Booking saved = bookingRepository.save(booking);
 
-        if (status == BookingStatus.CONFIRMED) {
-            String termDate = eventTerm.getStartDateTime() != null
-                    ? eventTerm.getStartDateTime().toString()
-                    : null;
-            String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
-            BookingCreatedPayload payload = new BookingCreatedPayload(
-                    saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                    status.name(), parentEmail, eventTerm.getEventName(), termDate,
-                    eventTerm.getOrganizationId(), eventTerm.getPrice());
-            bookingEventProducer.publishBookingCreated(payload);
-        }
+        String termDate = eventTerm.getStartDateTime() != null
+                ? eventTerm.getStartDateTime().toString()
+                : null;
+        String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
+        BookingCreatedPayload payload = new BookingCreatedPayload(
+                saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
+                status.name(), parentEmail, eventTerm.getEventName(), termDate,
+                eventTerm.getOrganizationId(), eventTerm.getPrice());
+        bookingEventProducer.publishBookingCreated(payload);
 
         return BookingResponse.from(saved);
     }
