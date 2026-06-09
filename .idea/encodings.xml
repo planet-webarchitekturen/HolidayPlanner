@@ -7,6 +7,8 @@
     <file url="file://$PROJECT_DIR$/booklet-request-service/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/booklet-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/booklet-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/e2e-tests/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/e2e-tests/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/event-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/event-service/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/identity-service/src/main/java" charset="UTF-8" />

@@ -9,7 +9,7 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: holidayplanner-db
+    container_name: holidayplanner-db-fhv
     <<: *default-logging
     environment:
       POSTGRES_USER: postgres
@@ -81,6 +81,9 @@ services:
         condition: service_healthy
 
   booking-service:
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/booking-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -106,6 +109,9 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   event-service:
+    build:
+      context: .
+      dockerfile: event-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/event-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -130,6 +136,9 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8083
 
   identity-service:
+    build:
+      context: .
+      dockerfile: identity-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/identity-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -152,6 +161,9 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:8082
 
   organization-service:
+    build:
+      context: .
+      dockerfile: organization-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/organization-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -174,6 +186,9 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8083
 
   payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/payment-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -196,6 +211,9 @@ services:
       SERVICES_BOOKING_SERVICE_URL: http://booking-service:8082
 
   notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/notification-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging
@@ -214,6 +232,9 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
   booklet-service:
+    build:
+      context: .
+      dockerfile: booklet-service/Dockerfile
     image: ghcr.io/planet-webarchitekturen/booklet-service:${IMAGE_TAG:-latest}
     pull_policy: always
     <<: *default-logging

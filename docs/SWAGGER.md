@@ -27,6 +27,9 @@ docker compose up -d postgres kafka
 
 ## Step 1 — Create an Account
 
+Run: `docker exec -i holidayplanner-db psql -U postgres < docker/seed-basic-data.sql`
+for basic data like organization
+
 Open the **Identity Service** Swagger: http://localhost:8083/swagger-ui.html
 
 1. Find `POST /api/auth/register`
@@ -35,7 +38,7 @@ Open the **Identity Service** Swagger: http://localhost:8083/swagger-ui.html
    - `email` → your email
    - `password` → your password
    - `phoneNumber` → your phone number (e.g. `+4366012345678`)
-   - `organizationId` → any valid UUID (e.g. `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)
+   - `organizationId` → any valid UUID (e.g. `11111111-1111-1111-1111-111111111111`)
 4. Click **Execute**
 
 ---
