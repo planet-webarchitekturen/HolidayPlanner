@@ -7,6 +7,9 @@ import lombok.Setter;
 
 import java.util.UUID;
 
+/**
+ * API view of a caregiver. Decouples the REST contract from the JPA entity.
+ */
 @Getter
 @Setter
 @NoArgsConstructor

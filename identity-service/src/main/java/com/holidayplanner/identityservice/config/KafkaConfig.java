@@ -30,11 +30,10 @@ import java.util.Map;
  * 
  * Topics Created:
  * - holiday-planner.identity.user-registered (from registerUser)
- * - holiday-planner.identity.user-phone-updated (from updatePhoneNumber)
+ * - holiday-planner.identity.user-updated (from updateUser)
+     * - holiday-planner.identity.user-deleted (from deleteUser)
  * - holiday-planner.identity.family-member-added (from addFamilyMember)
  * - holiday-planner.identity.family-member-removed (from removeFamilyMember)
- * - holiday-planner.booking.cancelled (consumed for future cascade logic)
- * - holiday-planner.payment.refunded (consumed for future notifications)
  */
 @Configuration
 @EnableKafka
@@ -57,6 +56,8 @@ public class KafkaConfig {
     /**
      * Topics produced by Identity Service
      */
+    //CHECK: Are these all the required topics? There are more endpoints than this, but maybe they dont need the even/broadcast, just the return value?
+    //Also means we have only these topics in a bunch of other files and in the payloads in the shared module. 
     @Bean
     public NewTopic userRegisteredTopic() {
         return TopicBuilder.name("holiday-planner.identity.user-registered")
@@ -66,8 +67,16 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic userPhoneUpdatedTopic() {
-        return TopicBuilder.name("holiday-planner.identity.user-phone-updated")
+    public NewTopic userUpdatedTopic() {
+        return TopicBuilder.name("holiday-planner.identity.user-updated")
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic userDeletedTopic() {
+        return TopicBuilder.name("holiday-planner.identity.user-deleted")
                 .partitions(3)
                 .replicas(1)
                 .build();
@@ -84,25 +93,6 @@ public class KafkaConfig {
     @Bean
     public NewTopic familyMemberRemovedTopic() {
         return TopicBuilder.name("holiday-planner.identity.family-member-removed")
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    /**
-     * Topics consumed by Identity Service (from other services)
-     */
-    @Bean
-    public NewTopic bookingCancelledTopic() {
-        return TopicBuilder.name("holiday-planner.booking.cancelled")
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    @Bean
-    public NewTopic paymentRefundedTopic() {
-        return TopicBuilder.name("holiday-planner.payment.refunded")
                 .partitions(3)
                 .replicas(1)
                 .build();
@@ -130,30 +120,4 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactory());
     }
 
-    // ============================================================
-    // KAFKA CONSUMER - Listening to Events
-    // ============================================================
-
-    @Bean
-    public ConsumerFactory<String, Object> consumerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, "identity-service");
-        configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        configProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.holidayplanner.identityservice.event.DomainEvent");
-        configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        configProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100);
-        return new DefaultKafkaConsumerFactory<>(configProps);
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory());
-        factory.setConcurrency(3);
-        return factory;
-    }
 }

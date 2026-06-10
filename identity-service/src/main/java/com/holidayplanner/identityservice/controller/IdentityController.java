@@ -1,14 +1,11 @@
 package com.holidayplanner.identityservice.controller;
 
-import com.holidayplanner.shared.model.Caregiver;
-import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
 import com.holidayplanner.identityservice.command.IdentityCommandService;
-import com.holidayplanner.identityservice.composition.IdentityCompositionService;
 import com.holidayplanner.identityservice.dto.*;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
-import com.holidayplanner.identityservice.service.IdentityService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +20,6 @@ import java.util.UUID;
  * Routes requests to appropriate services following CQRS pattern:
  * - POST/PATCH/DELETE endpoints → IdentityCommandService (write operations)
  * - GET endpoints → IdentityQueryService (read operations)
- * - Composition GET endpoints → IdentityCompositionService (enriched reads)
  */
 @RestController
 @RequiredArgsConstructor
@@ -31,8 +27,6 @@ public class IdentityController {
 
     private final IdentityCommandService commandService;
     private final IdentityQueryService queryService;
-    private final IdentityCompositionService compositionService;
-    private final IdentityService identityService;
 
     // --- Health Check ---
     @GetMapping("/api/identity/health")
@@ -49,13 +43,13 @@ public class IdentityController {
             @RequestParam("phoneNumber") String phoneNumber,
             @RequestParam("organizationId") UUID organizationId) {
         User user = commandService.registerUser(email, password, phoneNumber, organizationId);
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
     }
 
     @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
-        String token = identityService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
+        String token = queryService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
         User user = queryService.getUserByEmail(loginRequest.getEmail());
         return ResponseEntity.ok(new LoginResponse(
                 user.getId(),
@@ -69,6 +63,15 @@ public class IdentityController {
 
     // --- User Endpoints ---
 
+    @GetMapping("/api/identity/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        List<UserResponse> users = queryService.getAllUsers().stream()
+                .map(UserResponse::from)
+                .toList();
+        return ResponseEntity.ok(users);
+    }
+
     @GetMapping("/api/identity/users/{userId}")
     @PreAuthorize("hasAnyRole('USER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'EVENT_OWNER', 'ACCOUNTANT')")
     public ResponseEntity<UserResponse> getUser(@PathVariable("userId") UUID userId) {
@@ -76,47 +79,66 @@ public class IdentityController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @GetMapping("/api/identity/users/{userId}/profile")
-    public ResponseEntity<UserProfileEnrichedResponse> getUserProfile(@PathVariable("userId") UUID userId) {
-        return ResponseEntity.ok(compositionService.getUserProfileEnriched(userId));
+    @PatchMapping("/api/identity/users/{userId}")
+    @PreAuthorize("@identitySecurity.canUpdateUser(#userId, #request, authentication)")
+    public ResponseEntity<UserResponse> updateUser(
+            @PathVariable("userId") UUID userId,
+            @RequestBody UpdateUserRequest request) {
+        User user = commandService.updateUser(userId, request.getEmail(), request.getPhoneNumber(),
+                request.getPassword(), request.getRole(), request.getOrganizationId());
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @PatchMapping("/api/identity/users/{userId}/phone")
-    public ResponseEntity<UserResponse> updatePhone(
-            @PathVariable("userId") UUID userId,
-            @RequestParam("phoneNumber") String phoneNumber) {
-        User user = commandService.updatePhoneNumber(userId, phoneNumber);
-        return ResponseEntity.ok(UserResponse.from(user));
+    @DeleteMapping("/api/identity/users/{userId}")
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication) or hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteUser(@PathVariable("userId") UUID userId) {
+        commandService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
     }
 
     // --- FamilyMember Endpoints ---
 
     @GetMapping("/api/identity/users/{userId}/family-members")
-    public ResponseEntity<List<FamilyMember>> getFamilyMembers(@PathVariable("userId") UUID userId) {
-        return ResponseEntity.ok(queryService.getFamilyMembers(userId));
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
+    public ResponseEntity<List<FamilyMemberResponse>> getFamilyMembers(@PathVariable("userId") UUID userId) {
+        List<FamilyMemberResponse> members = queryService.getFamilyMembers(userId).stream()
+                .map(FamilyMemberResponse::from)
+                .toList();
+        return ResponseEntity.ok(members);
     }
 
     @PostMapping("/api/identity/users/{userId}/family-members")
-    public ResponseEntity<FamilyMember> addFamilyMember(
+    @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
+    public ResponseEntity<FamilyMemberResponse> addFamilyMember(
             @PathVariable("userId") UUID userId,
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
             @RequestParam("birthDate") LocalDate birthDate,
             @RequestParam("zip") String zip) {
-        return ResponseEntity.ok(commandService.addFamilyMember(userId, firstName, lastName, birthDate, zip));
+        return ResponseEntity.ok(FamilyMemberResponse.from(
+                commandService.addFamilyMember(userId, firstName, lastName, birthDate, zip)));
+    }
+
+    @GetMapping("/api/identity/family-members/{memberId}")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    public ResponseEntity<FamilyMemberResponse> getFamilyMember(@PathVariable("memberId") UUID memberId) {
+        return ResponseEntity.ok(FamilyMemberResponse.from(queryService.getFamilyMemberById(memberId)));
     }
 
     @PutMapping("/api/identity/family-members/{memberId}")
-    public ResponseEntity<FamilyMember> updateFamilyMember(
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication)")
+    public ResponseEntity<FamilyMemberResponse> updateFamilyMember(
             @PathVariable("memberId") UUID memberId,
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
             @RequestParam("birthDate") LocalDate birthDate,
             @RequestParam("zip") String zip) {
-        return ResponseEntity.ok(commandService.updateFamilyMember(memberId, firstName, lastName, birthDate, zip));
+        return ResponseEntity.ok(FamilyMemberResponse.from(
+                commandService.updateFamilyMember(memberId, firstName, lastName, birthDate, zip)));
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/owner-email")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
             @PathVariable("memberId") UUID memberId) {
         String email = queryService.getUserEmailByFamilyMemberId(memberId);
@@ -124,6 +146,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/display-name")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
@@ -131,6 +154,7 @@ public class IdentityController {
     }
 
     @DeleteMapping("/api/identity/family-members/{memberId}")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication)")
     public ResponseEntity<Void> removeFamilyMember(@PathVariable("memberId") UUID memberId) {
         commandService.removeFamilyMember(memberId);
         return ResponseEntity.noContent().build();
@@ -138,22 +162,49 @@ public class IdentityController {
 
     // --- Caregiver Endpoints ---
 
+    //CHECK: Can only Admins and event owners create caregivers? or anyone?
     @PostMapping("/api/identity/caregivers")
-    public ResponseEntity<Caregiver> createCaregiver(
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
+    public ResponseEntity<CaregiverResponse> createCaregiver(
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
             @RequestParam("email") String email,
             @RequestParam("phoneNumber") String phoneNumber) {
-        return ResponseEntity.ok(commandService.createCaregiver(firstName, lastName, email, phoneNumber));
+        return ResponseEntity.ok(CaregiverResponse.from(
+                commandService.createCaregiver(firstName, lastName, email, phoneNumber)));
     }
 
     @GetMapping("/api/identity/caregivers")
-    public ResponseEntity<List<Caregiver>> getAllCaregivers() {
-        return ResponseEntity.ok(queryService.getAllCaregivers());
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
+    public ResponseEntity<List<CaregiverResponse>> getAllCaregivers() {
+        List<CaregiverResponse> caregivers = queryService.getAllCaregivers().stream()
+                .map(CaregiverResponse::from)
+                .toList();
+        return ResponseEntity.ok(caregivers);
     }
 
     @GetMapping("/api/identity/caregivers/{caregiverId}")
-    public ResponseEntity<Caregiver> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
-        return ResponseEntity.ok(queryService.getCaregiverById(caregiverId));
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
+    public ResponseEntity<CaregiverResponse> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
+        return ResponseEntity.ok(CaregiverResponse.from(queryService.getCaregiverById(caregiverId)));
+    }
+
+    @PutMapping("/api/identity/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
+    public ResponseEntity<CaregiverResponse> updateCaregiver(
+            @PathVariable("caregiverId") UUID caregiverId,
+            @RequestParam("firstName") String firstName,
+            @RequestParam("lastName") String lastName,
+            @RequestParam("email") String email,
+            @RequestParam("phoneNumber") String phoneNumber) {
+        return ResponseEntity.ok(CaregiverResponse.from(
+                commandService.updateCaregiver(caregiverId, firstName, lastName, email, phoneNumber)));
+    }
+
+    @DeleteMapping("/api/identity/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
+    public ResponseEntity<Void> deleteCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
+        commandService.deleteCaregiver(caregiverId);
+        return ResponseEntity.noContent().build();
     }
 }

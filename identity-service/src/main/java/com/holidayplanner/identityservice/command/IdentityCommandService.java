@@ -3,40 +3,40 @@ package com.holidayplanner.identityservice.command;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
+import com.holidayplanner.shared.model.UserRole;
+import com.holidayplanner.shared.kafka.payload.FamilyMemberAddedPayload;
+import com.holidayplanner.shared.kafka.payload.FamilyMemberRemovedPayload;
+import com.holidayplanner.shared.kafka.payload.UserDeletedPayload;
+import com.holidayplanner.shared.kafka.payload.UserUpdatedPayload;
+import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
+import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
 import com.holidayplanner.identityservice.repository.UserRepository;
-import com.holidayplanner.identityservice.event.DomainEventPublisher;
-import com.holidayplanner.identityservice.event.UserRegisteredEvent;
-import com.holidayplanner.identityservice.event.UserPhoneUpdatedEvent;
-import com.holidayplanner.identityservice.event.FamilyMemberAddedEvent;
-import com.holidayplanner.identityservice.event.FamilyMemberRemovedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.Instant;
 import java.util.UUID;
 
 /**
  * Command Service for Identity Service.
- * 
- * Handles all write operations (commands):
+ *
+ * Handles all WRITE operations (commands):
  * - User registration and updates
  * - Family member creation, updates, and deletion
  * - Caregiver management
- * 
- * Commands modify state and should be transactional.
- * They are separated from queries (IdentityQueryService) following CQRS pattern,
- * allowing each to be optimized independently.
- * 
- * In the future, this service will publish Kafka events (e.g., identity.user.registered)
- * to trigger side effects in other services.
+ *
+ * Every command runs in a transaction: the aggregate change and the outbox row
+ * carrying its domain event commit together (transactional outbox pattern).
  */
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class IdentityCommandService {
 
@@ -44,8 +44,13 @@ public class IdentityCommandService {
     private final FamilyMemberRepository familyMemberRepository;
     private final CaregiverRepository caregiverRepository;
     private final PasswordEncoder passwordEncoder;
-    private final DomainEventPublisher eventPublisher;
+    private final IdentityEventProducer eventProducer;
+    private final BookingServiceClient bookingServiceClient;
 
+
+
+
+    // --- User Operations ---
     /**
      * Register a new user in the system.
      * 
@@ -71,43 +76,112 @@ public class IdentityCommandService {
         User saved = userRepository.save(user);
         log.info("User registered: {} for organization {}", email, organizationId);
         
-        // Publish domain event
-        UserRegisteredEvent event = new UserRegisteredEvent(
+        // Publish Kafka event
+        UserRegisteredPayload payload = new UserRegisteredPayload(
                 saved.getId(),
                 saved.getEmail(),
+                saved.getPhoneNumber(),
                 saved.getOrganizationId(),
-                Instant.now()
+                saved.getRole()
         );
-        eventPublisher.publishUserRegistered(event);
+        eventProducer.publishUserRegistered(payload);
         
         return saved;
     }
 
     /**
-     * Update a user's phone number.
-     * 
+     * Update a user's profile.
+     *
+     * Partial update: any argument left null is left unchanged. Email is re-checked
+     * for uniqueness, the password is re-hashed, and {@code role}/{@code organizationId}
+     * are administrative fields (authorization is enforced in the controller layer).
+     *
      * @param userId the user's ID
-     * @param phoneNumber the new phone number
+     * @param email new email, or null to keep the current one
+     * @param phoneNumber new phone number, or null to keep the current one
+     * @param password new plaintext password, or null to keep the current one
+     * @param role new role, or null to keep the current one
+     * @param organizationId new organization, or null to keep the current one
      * @return the updated User
-     * @throws RuntimeException if user not found
+     * @throws RuntimeException if user not found, or if the new email is already in use
      */
-    public User updatePhoneNumber(UUID userId, String phoneNumber) {
+    public User updateUser(UUID userId, String email, String phoneNumber,
+                           String password, UserRole role, UUID organizationId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        user.setPhoneNumber(phoneNumber);
+
+        if (email != null && !email.equals(user.getEmail())) {
+            if (userRepository.existsByEmail(email)) {
+                throw new RuntimeException("User already exists with email: " + email);
+            }
+            user.setEmail(email);
+        }
+        if (phoneNumber != null) {
+            user.setPhoneNumber(phoneNumber);
+        }
+        if (password != null) {
+            user.setPasswordHash(passwordEncoder.encode(password));
+        }
+        if (role != null) {
+            user.setRole(role);
+        }
+        if (organizationId != null) {
+            user.setOrganizationId(organizationId);
+        }
+
         User saved = userRepository.save(user);
-        log.debug("User {} phone number updated", userId);
-        
-        // Publish domain event
-        UserPhoneUpdatedEvent event = new UserPhoneUpdatedEvent(
+        log.info("User {} updated", userId);
+
+        // Publish Kafka event.
+        // We don't return the entity directly to consumers because we never want to
+        // expose the password hash; the event carries only the public profile fields.
+        UserUpdatedPayload payload = new UserUpdatedPayload(
                 saved.getId(),
-                saved.getPhoneNumber(),
-                Instant.now()
+                saved.getEmail(),
+                saved.getPhoneNumber()
         );
-        eventPublisher.publishUserPhoneUpdated(event);
-        
+        eventProducer.publishUserUpdated(payload);
+
         return saved;
     }
+
+    /**
+     * Delete a user and their family members.
+     *
+     * Pre-condition: none of the user's family members have active bookings
+     * (checked via booking-service, mirroring {@link #removeFamilyMember(UUID)}).
+     * Deleting the user cascades to their family members (orphanRemoval).
+     *
+     * @param userId the user's ID
+     * @throws RuntimeException if user not found
+     * @throws RuntimeException if any family member has active bookings
+     */
+    public void deleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        // Veto check: ensure no family member has active bookings before cascading the delete
+        for (FamilyMember member : familyMemberRepository.findByUser_Id(userId)) {
+            long activeBookingCount = bookingServiceClient.getActiveBookingCount(member.getId());
+            if (activeBookingCount > 0) {
+                throw new RuntimeException("Cannot delete user with family members that have active bookings. " +
+                        "Cancel all bookings first (" + activeBookingCount + " active bookings found for member " +
+                        member.getId() + ")");
+            }
+        }
+
+        String email = user.getEmail();
+        UUID organizationId = user.getOrganizationId();
+
+        userRepository.delete(user);
+        log.info("User {} deleted", userId);
+
+        // Publish Kafka event
+        UserDeletedPayload payload = new UserDeletedPayload(userId, email, organizationId);
+        eventProducer.publishUserDeleted(payload);
+    }
+
+    // --- FamilyMember Operations ---
 
     /**
      * Add a family member to a user's profile.
@@ -135,17 +209,13 @@ public class IdentityCommandService {
         FamilyMember saved = familyMemberRepository.save(member);
         log.info("Family member {} {} added to user {}", firstName, lastName, userId);
         
-        // Publish domain event
-        FamilyMemberAddedEvent event = new FamilyMemberAddedEvent(
-                saved.getId(),
+        // Publish Kafka event
+        FamilyMemberAddedPayload payload = new FamilyMemberAddedPayload(
                 userId,
-                firstName,
-                lastName,
-                birthDate,
-                zip,
-                Instant.now()
+                saved.getId(),
+                firstName + " " + lastName
         );
-        eventPublisher.publishFamilyMemberAdded(event);
+        eventProducer.publishFamilyMemberAdded(payload);
         
         return saved;
     }
@@ -176,21 +246,27 @@ public class IdentityCommandService {
         return saved;
     }
 
+
     /**
      * Remove a family member from the system.
      * 
-     * IMPORTANT: In production, this should check with booking-service to ensure
-     * the family member has no active bookings before deletion. For now, deletion is allowed.
+     * Pre-condition: Family member has no active bookings (checked via booking-service).
+     * If active bookings exist, deletion is rejected to maintain data consistency.
      * 
      * @param memberId the family member's ID
      * @throws RuntimeException if family member not found
+     * @throws RuntimeException if family member has active bookings
      */
     public void removeFamilyMember(UUID memberId) {
         FamilyMember member = familyMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("FamilyMember not found: " + memberId));
         
-        // TODO: Check with booking-service: hasActiveBookings(memberId)
-        // If true, reject deletion to maintain data consistency
+        // Veto check: ensure no active bookings exist for this family member
+        long activeBookingCount = bookingServiceClient.getActiveBookingCount(memberId);
+        if (activeBookingCount > 0) {
+            throw new RuntimeException("Cannot remove family member with active bookings. " +
+                    "Cancel all bookings first (" + activeBookingCount + " active bookings found)");
+        }
         
         String firstName = member.getFirstName();
         String lastName = member.getLastName();
@@ -199,16 +275,15 @@ public class IdentityCommandService {
         familyMemberRepository.deleteById(memberId);
         log.info("Family member {} removed", memberId);
         
-        // Publish domain event
-        FamilyMemberRemovedEvent event = new FamilyMemberRemovedEvent(
-                memberId,
+        // Publish Kafka event
+        FamilyMemberRemovedPayload payload = new FamilyMemberRemovedPayload(
                 userId,
-                firstName,
-                lastName,
-                Instant.now()
+                memberId
         );
-        eventPublisher.publishFamilyMemberRemoved(event);
+        eventProducer.publishFamilyMemberRemoved(payload);
     }
+
+    // --- Caregiver Operations ---
 
     /**
      * Create a new caregiver in the system.
@@ -235,5 +310,48 @@ public class IdentityCommandService {
         Caregiver saved = caregiverRepository.save(caregiver);
         log.info("Caregiver created: {} {}", firstName, lastName);
         return saved;
+    }
+
+    /**
+     * Update a caregiver's information.
+     *
+     * @param caregiverId the caregiver's ID
+     * @param firstName new first name
+     * @param lastName new last name
+     * @param email new email (must remain unique)
+     * @param phoneNumber new phone number
+     * @return the updated Caregiver
+     * @throws RuntimeException if caregiver not found, or if the new email is already in use
+     */
+    public Caregiver updateCaregiver(UUID caregiverId, String firstName, String lastName,
+                                     String email, String phoneNumber) {
+        Caregiver caregiver = caregiverRepository.findById(caregiverId)
+                .orElseThrow(() -> new RuntimeException("Caregiver not found: " + caregiverId));
+
+        if (!email.equals(caregiver.getEmail()) && caregiverRepository.existsByEmail(email)) {
+            throw new RuntimeException("Caregiver already exists with email: " + email);
+        }
+
+        caregiver.setFirstName(firstName);
+        caregiver.setLastName(lastName);
+        caregiver.setEmail(email);
+        caregiver.setPhoneNumber(phoneNumber);
+
+        Caregiver saved = caregiverRepository.save(caregiver);
+        log.info("Caregiver {} updated", caregiverId);
+        return saved;
+    }
+
+    /**
+     * Delete a caregiver from the system.
+     *
+     * @param caregiverId the caregiver's ID
+     * @throws RuntimeException if caregiver not found
+     */
+    public void deleteCaregiver(UUID caregiverId) {
+        Caregiver caregiver = caregiverRepository.findById(caregiverId)
+                .orElseThrow(() -> new RuntimeException("Caregiver not found: " + caregiverId));
+        caregiverRepository.delete(caregiver);
+        log.info("Caregiver {} deleted", caregiverId);
     }
 }

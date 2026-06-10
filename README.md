@@ -261,3 +261,4 @@ See [docs/messaging-conventions.md](docs/messaging-conventions.md) for the full 
 - [Messaging Conventions](docs/messaging-conventions.md)
 - [Testing Notes](docs/testing-notes.md)
 - [Event Service design](docs/event-service-design.md)
+- [Identity Service](docs/identity-service.md) — REST API, events, outbox, sagas, authorization

@@ -144,6 +144,6 @@ Topics are auto-created on first use (`KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "tru
 
 1. **Dead-letter topics** — should we add a `*.dlq` topic per consumer so failed messages are not silently dropped?
 2. **Ordering guarantees** — we use entity ID as the message key, but within one partition messages are ordered. Is this sufficient for our use cases?
-3. **Outbox pattern** — publishing after `repository.save()` is not atomic. If the service crashes between save and publish, the event is lost. Should we use an outbox table?
+3. **Outbox pattern** — publishing after `repository.save()` is not atomic. If the service crashes between save and publish, the event is lost. **Implemented in identity-service** (see [identity-service.md](identity-service.md) §6): events are written to an `outbox_events` table inside the command transaction and relayed to Kafka by a scheduled publisher. Remaining open question: roll this out to the other producing services (booking, event, payment)?
 4. **Schema versioning** — the `version` field in `KafkaEnvelope` is a string today. Should we enforce breaking vs non-breaking changes with a proper policy?
 5. **Authentication** — the Kafka broker runs with `ALLOW_PLAINTEXT_LISTENER=yes`. Is this acceptable for the demo, or do we need SASL for the final presentation?
