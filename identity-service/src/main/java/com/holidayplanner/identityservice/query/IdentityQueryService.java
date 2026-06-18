@@ -42,6 +42,7 @@ public class IdentityQueryService {
     private final CaregiverRepository caregiverRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final com.holidayplanner.identityservice.service.RefreshTokenService refreshTokenService;
 
 
     /**
@@ -158,5 +159,38 @@ public class IdentityQueryService {
 
         List<String> roles = List.of(user.getRole().toString());
         return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+    }
+
+    public record LoginTokens(String accessToken, String refreshToken) { }
+
+    public record LoginTokensWithUser(java.util.UUID userId, String accessToken, String refreshToken) { }
+
+    public LoginTokens loginUserWithRefresh(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        List<String> roles = List.of(user.getRole().toString());
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+        // create refresh token
+        var refresh = refreshTokenService.createRefreshToken(user.getId());
+        return new LoginTokens(accessToken, refresh.getToken());
+    }
+
+    public LoginTokensWithUser loginWithRefreshToken(String refreshToken) {
+        var rtOpt = refreshTokenService.findByToken(refreshToken);
+        var rt = rtOpt.orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+        if (rt.isRevoked()) throw new RuntimeException("Refresh token revoked");
+        if (rt.getExpiryDate().isBefore(java.time.Instant.now())) throw new RuntimeException("Refresh token expired");
+        UUID userId = rt.getUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found for refresh token: " + userId));
+        List<String> roles = List.of(user.getRole().toString());
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+        var newRt = refreshTokenService.rotate(rt);
+        return new LoginTokensWithUser(user.getId(), accessToken, newRt.getToken());
     }
 }
