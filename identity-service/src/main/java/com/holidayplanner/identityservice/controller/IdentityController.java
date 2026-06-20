@@ -49,33 +49,17 @@ public class IdentityController {
     @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
-        var tokens = queryService.loginUserWithRefresh(loginRequest.getEmail(), loginRequest.getPassword());
+        String token = queryService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
         User user = queryService.getUserByEmail(loginRequest.getEmail());
         return ResponseEntity.ok(new LoginResponse(
-            user.getId(),
-            user.getEmail(),
-            user.getPhoneNumber(),
-            user.getOrganizationId(),
-            user.getRole(),
-            tokens.accessToken(),
-            tokens.refreshToken()
+                user.getId(),
+                user.getEmail(),
+                user.getPhoneNumber(),
+                user.getOrganizationId(),
+                user.getRole(),
+                token
         ));
     }
-
-        @PostMapping("/api/auth/refresh")
-        public ResponseEntity<LoginResponse> refresh(@RequestBody RefreshRequest request) {
-        var result = queryService.loginWithRefreshToken(request.getRefreshToken());
-        User user = queryService.getUserById(result.userId());
-        return ResponseEntity.ok(new LoginResponse(
-            user.getId(),
-            user.getEmail(),
-            user.getPhoneNumber(),
-            user.getOrganizationId(),
-            user.getRole(),
-            result.accessToken(),
-            result.refreshToken()
-        ));
-        }
 
     // --- User Endpoints ---
 

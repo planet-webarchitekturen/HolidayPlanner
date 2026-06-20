@@ -1,7 +1,6 @@
 package com.holidayplanner.identityservice.config;
 
 import com.holidayplanner.shared.security.JwtAuthenticationFilter;
-import com.holidayplanner.shared.security.ServiceAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -21,8 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http,
-            ServiceAuthenticationFilter serviceFilter,
+    public SecurityFilterChain filterChain(HttpSecurity http,
             JwtAuthenticationFilter jwtFilter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
@@ -37,7 +35,6 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(serviceFilter, JwtAuthenticationFilter.class)
             .exceptionHandling(e -> e
                 .accessDeniedHandler((req, res, ex) -> {
                     res.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -56,12 +53,6 @@ public class SecurityConfig {
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             @Value("${jwt.secret}") String secret) {
         return new JwtAuthenticationFilter(secret);
-    }
-
-    @Bean
-    public ServiceAuthenticationFilter serviceAuthenticationFilter(
-            @Value("${service.secret}") String secret) {
-        return new ServiceAuthenticationFilter(secret);
     }
 
     @Bean

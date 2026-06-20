@@ -6,9 +6,7 @@ import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.organizationservice.repository.SponsorRepository;
 import com.holidayplanner.organizationservice.repository.TeamMemberRepository;
 import com.holidayplanner.shared.kafka.payload.OrganizationCreatedPayload;
-import com.holidayplanner.shared.kafka.payload.OrganizationDeletionStartedPayload;
 import com.holidayplanner.shared.model.Organization;
-import com.holidayplanner.shared.model.OrganizationStatus;
 import com.holidayplanner.shared.model.Sponsor;
 import com.holidayplanner.shared.model.TeamMember;
 import com.holidayplanner.shared.model.TeamMemberRole;
@@ -95,18 +93,9 @@ public class OrganizationCommandService {
     }
 
     public void deleteOrganization(UUID organizationId) {
-        Organization org = organizationRepository.findById(organizationId)
+        organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new RuntimeException("Organization not found: " + organizationId));
-        
-        // Set status to DELETING to start the saga
-        org.setStatus(OrganizationStatus.DELETING);
-        organizationRepository.save(org);
-        
-        // Publish event to trigger cascade deletions
-        OrganizationDeletionStartedPayload payload = new OrganizationDeletionStartedPayload(
-                org.getId(),
-                org.getName()
-        );
-        organizationEventProducer.publishOrganizationDeletionStarted(payload);
+        eventServiceClient.deleteEventsByOrganization(organizationId);
+        organizationRepository.deleteById(organizationId);
     }
 }
