@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TypeReference;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 

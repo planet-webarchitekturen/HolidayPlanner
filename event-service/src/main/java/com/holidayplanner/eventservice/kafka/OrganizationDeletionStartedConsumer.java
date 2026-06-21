@@ -16,7 +16,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.TypeReference;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @Slf4j
 @Service

@@ -6,7 +6,7 @@ import com.holidayplanner.identityservice.dto.LoginRequest;
 import com.holidayplanner.identityservice.dto.LoginResponse;
 import com.holidayplanner.identityservice.dto.RefreshRequest;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
-import com.holidayplanner.identityservice.service.JwtTokenProvider;
+import com.holidayplanner.identityservice.config.JwtTokenProvider;
 import com.holidayplanner.shared.model.User;
 import com.holidayplanner.shared.model.UserRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
+import java.util.List;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
@@ -84,7 +85,7 @@ class JwtAuthenticationIntegrationTest {
     @Test
     void testLoginReturnsAccessAndRefreshTokens() throws Exception {
         // Arrange
-        String accessToken = jwtTokenProvider.generateToken(testUserId, testOrgId, UserRole.USER, testEmail);
+        String accessToken = jwtTokenProvider.generateToken(testUserId, testOrgId, List.of(UserRole.USER.name()), testEmail);
         String refreshToken = UUID.randomUUID().toString();
         
         when(queryService.loginUserWithRefresh(testEmail, testPassword))
@@ -110,7 +111,7 @@ class JwtAuthenticationIntegrationTest {
     void testRefreshTokenEndpointReturnsNewTokens() throws Exception {
         // Arrange
         String oldRefreshToken = UUID.randomUUID().toString();
-        String newAccessToken = jwtTokenProvider.generateToken(testUserId, testOrgId, UserRole.USER, testEmail);
+        String newAccessToken = jwtTokenProvider.generateToken(testUserId, testOrgId, List.of(UserRole.USER.name()), testEmail);
         String newRefreshToken = UUID.randomUUID().toString();
 
         when(queryService.loginWithRefreshToken(oldRefreshToken))
@@ -159,7 +160,7 @@ class JwtAuthenticationIntegrationTest {
     @Test
     void testTokenContainsCorrectClaims() throws Exception {
         // Arrange - Generate a token and verify claims
-        String token = jwtTokenProvider.generateToken(testUserId, testOrgId, UserRole.USER, testEmail);
+        String token = jwtTokenProvider.generateToken(testUserId, testOrgId, List.of(UserRole.USER.name()), testEmail);
 
         // Act - Verify token can be extracted and validated
         UUID extractedUserId = jwtTokenProvider.getUserIdFromToken(token);

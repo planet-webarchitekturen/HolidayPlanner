@@ -64,7 +64,9 @@ class BookingCancelledConsumerTest {
                 "parent@example.test",
                 "Bike Adventure",
                 "2026-06-15T09:00",
-                cancelledBy);
+                cancelledBy,
+                UUID.randomUUID(),   // organizationId
+                UUID.randomUUID());  // eventId
         KafkaEnvelope<BookingCancelledPayload> envelope = new KafkaEnvelope<>(
                 "BookingCancelled", "1", LocalDateTime.now().toString(), "booking-service", payload);
         return objectMapper.writeValueAsString(envelope);

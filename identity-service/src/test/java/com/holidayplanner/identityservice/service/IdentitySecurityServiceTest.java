@@ -88,7 +88,9 @@ class IdentitySecurityServiceTest {
         // Arrange
         FamilyMember member = new FamilyMember();
         member.setId(memberId);
-        member.setUserId(userId1);
+        User owner = new User();
+        owner.setId(userId1);
+        member.setUser(owner);
 
         when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -104,7 +106,9 @@ class IdentitySecurityServiceTest {
         // Arrange
         FamilyMember member = new FamilyMember();
         member.setId(memberId);
-        member.setUserId(userId2); // Different owner
+        User differentOwner = new User();
+        differentOwner.setId(userId2);
+        member.setUser(differentOwner);
 
         when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
 

@@ -17,4 +17,6 @@ public class BookingCancelledPayload {
     private String eventName;
     private String termDate;
     private String cancelledBy;
+    private UUID organizationId;
+    private UUID eventId;
 }

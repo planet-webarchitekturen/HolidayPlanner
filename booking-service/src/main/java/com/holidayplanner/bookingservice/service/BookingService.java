@@ -66,7 +66,8 @@ public class BookingService {
 
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                null, null, null, "parent");
+                null, null, null, "parent",
+                null, null);
         bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();

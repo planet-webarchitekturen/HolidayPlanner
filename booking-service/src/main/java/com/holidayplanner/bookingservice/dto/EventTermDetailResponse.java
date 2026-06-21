@@ -13,6 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class EventTermDetailResponse {
     private UUID id;
+    private UUID eventId;
     private String eventName;
     private String eventLocation;
     private BigDecimal price;
