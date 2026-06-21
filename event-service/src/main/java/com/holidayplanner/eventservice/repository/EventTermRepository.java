@@ -17,6 +17,8 @@ public interface EventTermRepository extends JpaRepository<EventTerm, UUID> {
 
     List<EventTerm> findByEvent_Id(UUID eventId);
 
+    List<EventTerm> findByEvent_IdAndStatus(UUID eventId, EventTermStatus status);
+
     List<EventTerm> findByStatus(EventTermStatus status);
 
     @Query("SELECT t FROM EventTerm t JOIN FETCH t.event WHERE t.id = :id")

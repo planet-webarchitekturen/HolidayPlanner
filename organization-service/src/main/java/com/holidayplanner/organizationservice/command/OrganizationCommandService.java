@@ -1,6 +1,7 @@
 package com.holidayplanner.organizationservice.command;
 
 import com.holidayplanner.organizationservice.client.EventServiceClient;
+import com.holidayplanner.organizationservice.kafka.OrganizationDeletionCompletionService;
 import com.holidayplanner.organizationservice.kafka.OrganizationEventProducer;
 import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.organizationservice.repository.SponsorRepository;
@@ -28,6 +29,7 @@ public class OrganizationCommandService {
     private final SponsorRepository sponsorRepository;
     private final OrganizationEventProducer organizationEventProducer;
     private final EventServiceClient eventServiceClient;
+    private final OrganizationDeletionCompletionService completionService;
 
     public Organization createOrganization(String name, String bankAccount,
                                            LocalDateTime bookingStartTime) {
@@ -108,5 +110,10 @@ public class OrganizationCommandService {
                 org.getName()
         );
         organizationEventProducer.publishOrganizationDeletionStarted(payload);
+
+        // Guarantees eventual completion even if this organization has no active
+        // terms/bookings to cancel (and therefore no BookingCancelled events will
+        // ever arrive to trigger finalization otherwise).
+        completionService.scheduleFallback(org.getId());
     }
 }

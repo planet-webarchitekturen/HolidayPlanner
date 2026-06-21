@@ -93,6 +93,8 @@ public class BookingCommandService {
             EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
             eventName = term.getEventName();
             termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            eventTermOrganizationId = term.getOrganizationId();
+            eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
         }

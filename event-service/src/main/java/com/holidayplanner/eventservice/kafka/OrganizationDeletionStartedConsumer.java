@@ -46,13 +46,12 @@ public class OrganizationDeletionStartedConsumer {
 
             // For each event, find and cancel all ACTIVE terms
             for (Event event : events) {
-                List<EventTerm> activeTerms = eventTermRepository.findByStatus(EventTermStatus.ACTIVE);
+                List<EventTerm> activeTerms = eventTermRepository.findByEvent_IdAndStatus(
+                        event.getId(), EventTermStatus.ACTIVE);
                 for (EventTerm term : activeTerms) {
-                    if (term.getEvent() != null && term.getEvent().getId().equals(event.getId())) {
-                        // Start cancellation saga for this term
-                        log.info("Cancelling event term {} as part of organization deletion", term.getId());
-                        eventTermCancellationSaga.start(term, CancellationActor.SYSTEM);
-                    }
+                    // Start cancellation saga for this term
+                    log.info("Cancelling event term {} as part of organization deletion", term.getId());
+                    eventTermCancellationSaga.start(term, CancellationActor.SYSTEM);
                 }
             }
 
