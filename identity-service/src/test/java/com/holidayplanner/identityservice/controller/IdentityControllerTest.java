@@ -63,7 +63,7 @@ class IdentityControllerTest {
                         .param("password", "secret")
                         .param("phoneNumber", "222")
                         .param("organizationId", orgId.toString()))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value("bob@example.com"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
