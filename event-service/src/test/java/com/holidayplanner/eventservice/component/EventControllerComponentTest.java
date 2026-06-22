@@ -10,6 +10,7 @@ import com.holidayplanner.eventservice.dto.CreateEventTermRequest;
 import com.holidayplanner.eventservice.kafka.EventTermEventProducer;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
+import com.holidayplanner.eventservice.support.TestJwt;
 import com.holidayplanner.shared.model.EventTermStatus;
 import com.holidayplanner.shared.model.PaymentMethod;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,10 +19,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -67,6 +71,8 @@ class EventControllerComponentTest {
     @MockBean
     private NotificationServiceClient notificationServiceClient;
 
+    private static final String BEARER = "Bearer " + TestJwt.token("EVENT_OWNER", "ADMIN");
+
     @BeforeEach
     void clean() {
         eventTermRepository.deleteAll();
@@ -74,9 +80,14 @@ class EventControllerComponentTest {
         when(bookingServiceClient.getConfirmedBookingCount(any())).thenReturn(0L);
     }
 
+    /** Performs the request with an EVENT_OWNER/ADMIN JWT so it passes the security filter + @PreAuthorize. */
+    private ResultActions send(MockHttpServletRequestBuilder builder) throws Exception {
+        return mockMvc.perform(builder.header(HttpHeaders.AUTHORIZATION, BEARER));
+    }
+
     @Test
     void health_returns200() throws Exception {
-        mockMvc.perform(get("/api/events/health"))
+        send(get("/api/events/health"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
                         .string("EventService is running!"));
@@ -84,7 +95,7 @@ class EventControllerComponentTest {
 
     @Test
     void getEventTerm_whenMissing_returns404() throws Exception {
-        mockMvc.perform(get("/api/events/terms/{id}", UUID.randomUUID()))
+        send(get("/api/events/terms/{id}", UUID.randomUUID()))
                 .andExpect(status().isNotFound());
     }
 
@@ -101,7 +112,7 @@ class EventControllerComponentTest {
         create.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
         create.setMinimalAge(1);
         create.setMaximalAge(10);
-        String body = mockMvc.perform(post("/api/events")
+        String body = send(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(create)))
                 .andExpect(status().isCreated())
@@ -113,7 +124,7 @@ class EventControllerComponentTest {
         termReq.setEndDateTime(LocalDateTime.now().plusDays(1).plusHours(1));
         termReq.setMinParticipants(1);
         termReq.setMaxParticipants(5);
-        String termBody = mockMvc.perform(post("/api/events/{eventId}/terms", eventId)
+        String termBody = send(post("/api/events/{eventId}/terms", eventId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(termReq)))
                 .andExpect(status().isCreated())
@@ -122,14 +133,14 @@ class EventControllerComponentTest {
 
         ChangeStatusRequest toActive = new ChangeStatusRequest();
         toActive.setNewStatus(EventTermStatus.ACTIVE);
-        mockMvc.perform(patch("/api/events/terms/{id}/status", termId)
+        send(patch("/api/events/terms/{id}/status", termId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(toActive)))
                 .andExpect(status().isOk());
 
         ChangeStatusRequest toDraft = new ChangeStatusRequest();
         toDraft.setNewStatus(EventTermStatus.DRAFT);
-        mockMvc.perform(patch("/api/events/terms/{id}/status", termId)
+        send(patch("/api/events/terms/{id}/status", termId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(toDraft)))
                 .andExpect(status().isBadRequest());
@@ -138,7 +149,7 @@ class EventControllerComponentTest {
     @Test
     void getEventsByOrganization_returnsArray() throws Exception {
         UUID org = UUID.randomUUID();
-        mockMvc.perform(get("/api/events").param("organizationId", org.toString()))
+        send(get("/api/events").param("organizationId", org.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }

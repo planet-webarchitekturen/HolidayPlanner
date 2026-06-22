@@ -5,15 +5,19 @@ import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
+import com.holidayplanner.bookingservice.support.TestJwt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.UUID;
 
@@ -48,10 +52,16 @@ class BookingProviderContractTest {
 
     private static final UUID FAMILY_MEMBER_ID = UUID.randomUUID();
     private static final UUID EVENT_TERM_ID     = UUID.randomUUID();
+    private static final String USER_BEARER = "Bearer " + TestJwt.token("USER");
 
     @BeforeEach
     void setUp() {
         bookingRepository.deleteAll();
+    }
+
+    /** Performs the request with a USER JWT so it passes the security filter + @PreAuthorize checks. */
+    private ResultActions send(MockHttpServletRequestBuilder builder) throws Exception {
+        return mockMvc.perform(builder.header(HttpHeaders.AUTHORIZATION, USER_BEARER));
     }
 
     // ── Contract: POST /api/bookings → 200 Booking ───────────────────────────
@@ -63,7 +73,7 @@ class BookingProviderContractTest {
         term.setMaxParticipants(10);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
 
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andExpect(status().isOk())
@@ -86,7 +96,7 @@ class BookingProviderContractTest {
         when(eventServiceClient.getEventTerm(any())).thenReturn(term);
 
         // First booking must be CONFIRMED when capacity allows
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", UUID.randomUUID().toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
@@ -98,7 +108,7 @@ class BookingProviderContractTest {
         when(eventServiceClient.getEventTerm(any())).thenReturn(full);
 
         UUID other = UUID.randomUUID();
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", UUID.randomUUID().toString())
                         .param("eventTermId", other.toString()))
                 .andExpect(jsonPath("$.status").value("WAITLISTED"));
@@ -113,14 +123,14 @@ class BookingProviderContractTest {
         term.setMaxParticipants(10);
         when(eventServiceClient.getEventTerm(any())).thenReturn(term);
 
-        String created = mockMvc.perform(post("/api/bookings")
+        String created = send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andReturn().getResponse().getContentAsString();
 
         String bookingId = created.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
 
-        mockMvc.perform(delete("/api/bookings/" + bookingId))
+        send(delete("/api/bookings/" + bookingId))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
                 .andExpect(jsonPath("$.id").isString())
@@ -134,7 +144,7 @@ class BookingProviderContractTest {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID))
                 .thenThrow(new EventTermNotFoundException(EVENT_TERM_ID));
 
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andExpect(status().isNotFound())
@@ -151,7 +161,7 @@ class BookingProviderContractTest {
                 .thenThrow(new EventServiceException("Event service unavailable",
                         new RuntimeException("Connection refused")));
 
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andExpect(status().isServiceUnavailable())
@@ -166,7 +176,7 @@ class BookingProviderContractTest {
     void contract_404ErrorShape_whenBookingNotFound() throws Exception {
         UUID unknown = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/bookings/" + unknown))
+        send(delete("/api/bookings/" + unknown))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
                 .andExpect(jsonPath("$.status").value(404))
@@ -182,7 +192,7 @@ class BookingProviderContractTest {
         draft.setMaxParticipants(10);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(draft);
 
-        mockMvc.perform(post("/api/bookings")
+        send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
                         .param("eventTermId", EVENT_TERM_ID.toString()))
                 .andExpect(status().isConflict())

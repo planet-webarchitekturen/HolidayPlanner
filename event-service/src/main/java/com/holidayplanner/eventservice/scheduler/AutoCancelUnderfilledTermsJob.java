@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -21,11 +22,12 @@ public class AutoCancelUnderfilledTermsJob {
     private final EventTermQueryService eventTermQueryService;
     private final EventTermCommandService eventTermCommandService;
     private final BookingServicePort bookingServicePort;
+    private final Clock clock;
 
     // Runs on 03:00 AM every day, gets all ACTIVE event terms asks booking-service for the count of confirmed bookings. If the count is below the minimum, cancels the term.
     @Scheduled(cron = "${event-service.scheduler.auto-cancel-cron:0 0 3 * * *}")
     public void autoCancelUnderfilledTerms() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         for (EventTerm term : eventTermQueryService.findActiveTermsStartingWithin24Hours(now)) {
             try {
                 long confirmed = bookingServicePort.getConfirmedBookingCount(term.getId());
