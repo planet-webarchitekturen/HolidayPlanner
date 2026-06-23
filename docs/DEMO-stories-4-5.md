@@ -41,19 +41,54 @@ open http://localhost:5001                 # Kafka UI on a second screen
 ```
 **Keep Kafka UI visible** — it is your strongest visual. Watch topics fill in real time.
 
-## 2. The live flow
-Run the script and narrate, or do the curls manually:
+## 2. The live flow — Swagger UI + Kafka UI (recommended)
+
+The system has no app frontend (it's backend microservices), but every service ships a
+**Swagger UI** — a clickable web page for its API. You'll *trigger* actions in Swagger and
+*watch the events* in Kafka UI. That looks like a UI demo **and** shows the event-driven
+architecture, which is the point.
+
+### Step 0 — build the scenario (do this just before, or on stage)
 ```bash
-bash scripts/demo-stories-4-5.sh           # use bash, NOT zsh ($UID/$USER are reserved in zsh)
+bash scripts/demo-setup.sh        # use bash, NOT zsh
 ```
-Expected output:
-```
-Anna books  -> CONFIRMED
-Ben books   -> WAITLISTED
-── Story 5: raise capacity 1→2 ──
-Ben now     -> CONFIRMED       (auto-promoted via Kafka)
-── Story 4: cancel term ──
-Anna CANCELLED / Ben CANCELLED (cascade via Kafka)
+It leaves the system at **Anna = CONFIRMED, Ben = WAITLISTED** and prints three things you copy:
+- a **token** (paste into Swagger "Authorize")
+- the **TERM ID** and **BEN booking ID**
+
+Open three browser tabs:
+- Event Swagger → http://localhost:8081/swagger-ui/index.html
+- Booking Swagger → http://localhost:8082/swagger-ui/index.html
+- Kafka UI → http://localhost:5001
+
+In **both** Swagger tabs: click the green **Authorize** button (top-right), paste the **raw token**
+(no "Bearer "), Authorize → Close. Now every call is authenticated.
+
+### Step 1 — Story 5: raise capacity → auto-promotion
+1. **Booking Swagger** → `GET /api/bookings/{id}` → *Try it out* → paste **BEN booking ID** → *Execute*
+   → response shows **`WAITLISTED`**.
+2. **Event Swagger** → `PATCH /api/events/terms/{eventTermId}/capacity` → *Try it out*
+   → `eventTermId` = **TERM ID**, body `{"minParticipants":1,"maxParticipants":2}` → *Execute* → **200**.
+3. **Kafka UI** → open `holiday-planner.event.capacity-increased` (new message — expand it to show
+   `eventTermId`, `addedSlots`, `newMax`), then `holiday-planner.booking.waitlist-promoted`
+   (the message **your consumer** produced).
+4. **Booking Swagger** → run the same `GET /api/bookings/{id}` (BEN booking ID) again → now **`CONFIRMED`** 🎉.
+
+> Say: *"I never touched Ben's booking. event-service published `CapacityIncreased`; my consumer read it,
+> promoted the oldest waitlisted child (FIFO), and published `WaitlistPromoted`."*
+
+### Step 2 — Story 4: cancel the term → cascade
+5. **Event Swagger** → `PATCH /api/events/terms/{eventTermId}/status` → `eventTermId` = **TERM ID**,
+   body `{"newStatus":"CANCELLED"}` → *Execute* → **200**.
+6. **Kafka UI** → `holiday-planner.event.term-cancelled` (1 message) and
+   `holiday-planner.booking.cancelled` (one per booking).
+7. **Booking Swagger** → `GET /api/bookings/event-term/{eventTermId}` → **TERM ID** → *Execute*
+   → every booking is **`CANCELLED`**.
+
+### Backup (if a click misbehaves on stage)
+Run the whole thing non-interactively — same flow, prints each status:
+```bash
+bash scripts/demo-stories-4-5.sh
 ```
 
 ## 3. Show cause → effect in Kafka UI
