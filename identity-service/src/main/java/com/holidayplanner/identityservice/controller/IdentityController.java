@@ -146,7 +146,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/display-name")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER', 'SERVICE')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
