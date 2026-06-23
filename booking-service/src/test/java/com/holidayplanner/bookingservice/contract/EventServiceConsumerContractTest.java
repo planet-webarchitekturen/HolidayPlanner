@@ -50,20 +50,27 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_whenActiveResponse_parsesAllFields() {
         UUID id = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
         wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(okJson("""
                         {
                           "id": "%s",
                           "status": "ACTIVE",
-                          "maxParticipants": 20
+                          "maxParticipants": 20,
+                          "organizationId": "%s",
+                          "minimalAge": 6,
+                          "maximalAge": 12
                         }
-                        """.formatted(id))));
+                        """.formatted(id, organizationId))));
 
         EventTermDetailResponse details = eventServiceClient.getEventTerm(id);
 
         assertThat(details.getId()).isEqualTo(id);
         assertThat(details.getStatus()).isEqualTo("ACTIVE");
         assertThat(details.getMaxParticipants()).isEqualTo(20);
+        assertThat(details.getOrganizationId()).isEqualTo(organizationId);
+        assertThat(details.getMinimalAge()).isEqualTo(6);
+        assertThat(details.getMaximalAge()).isEqualTo(12);
     }
 
     @Test

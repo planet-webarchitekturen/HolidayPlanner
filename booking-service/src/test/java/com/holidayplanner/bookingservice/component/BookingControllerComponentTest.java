@@ -1,7 +1,11 @@
 package com.holidayplanner.bookingservice.component;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
+import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
@@ -19,8 +23,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -45,13 +52,23 @@ class BookingControllerComponentTest {
     @MockBean
     private EventServiceClient eventServiceClient;
 
+    @MockBean
+    private IdentityServiceClient identityServiceClient;
+
+    @MockBean
+    private OrganizationServiceClient organizationServiceClient;
+
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();
     private static final UUID FAMILY_MEMBER_ID = UUID.randomUUID();
+    private static final UUID ORGANIZATION_ID = UUID.randomUUID();
     private static final String USER_BEARER = "Bearer " + TestJwt.token("USER");
 
     @BeforeEach
     void setUp() {
         bookingRepository.deleteAll();
+        when(identityServiceClient.getFamilyMember(any())).thenAnswer(inv ->
+                familyMember(inv.getArgument(0, UUID.class)));
+        when(organizationServiceClient.getOrganization(any())).thenReturn(openOrganization());
     }
 
     /** Performs the request with a USER JWT so it passes the security filter + @PreAuthorize checks. */
@@ -64,7 +81,25 @@ class BookingControllerComponentTest {
         d.setId(EVENT_TERM_ID);
         d.setStatus("ACTIVE");
         d.setMaxParticipants(maxParticipants);
+        d.setOrganizationId(ORGANIZATION_ID);
+        d.setStartDateTime(LocalDateTime.now().plusDays(14));
+        d.setMinimalAge(6);
+        d.setMaximalAge(16);
         return d;
+    }
+
+    private FamilyMemberResponse familyMember(UUID id) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(id);
+        r.setBirthDate(LocalDate.now().minusYears(10));
+        return r;
+    }
+
+    private OrganizationResponse openOrganization() {
+        OrganizationResponse r = new OrganizationResponse();
+        r.setId(ORGANIZATION_ID);
+        r.setBookingStartTime(LocalDateTime.now().minusDays(1));
+        return r;
     }
 
     // ── health ────────────────────────────────────────────────────────────────
@@ -161,7 +196,61 @@ class BookingControllerComponentTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ── DELETE /api/bookings/{id} ─────────────────────────────────────────────
+    // Additional POST /api/bookings validation cases
+
+    @Test
+    void createBooking_whenFamilyMemberUnderage_returns400AndDoesNotPersist() throws Exception {
+        FamilyMemberResponse underage = familyMember(FAMILY_MEMBER_ID);
+        underage.setBirthDate(LocalDate.now().minusYears(5));
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(underage);
+
+        send(post("/api/bookings")
+                        .param("familyMemberId", FAMILY_MEMBER_ID.toString())
+                        .param("eventTermId", EVENT_TERM_ID.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        assertThat(bookingRepository.count()).isZero();
+    }
+
+    @Test
+    void createBooking_whenBookingWindowNotOpen_returns409AndDoesNotPersist() throws Exception {
+        OrganizationResponse futureOrganization = openOrganization();
+        futureOrganization.setBookingStartTime(LocalDateTime.now().plusDays(1));
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(futureOrganization);
+
+        send(post("/api/bookings")
+                        .param("familyMemberId", FAMILY_MEMBER_ID.toString())
+                        .param("eventTermId", EVENT_TERM_ID.toString()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+
+        assertThat(bookingRepository.count()).isZero();
+    }
+
+    @Test
+    void createBooking_whenDuplicateActiveBooking_returns409AndDoesNotPersistSecondBooking() throws Exception {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+
+        send(post("/api/bookings")
+                        .param("familyMemberId", FAMILY_MEMBER_ID.toString())
+                        .param("eventTermId", EVENT_TERM_ID.toString()))
+                .andExpect(status().isOk());
+
+        send(post("/api/bookings")
+                        .param("familyMemberId", FAMILY_MEMBER_ID.toString())
+                        .param("eventTermId", EVENT_TERM_ID.toString()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+
+        assertThat(bookingRepository.count()).isEqualTo(1);
+    }
+
+    // DELETE /api/bookings/{id}
 
     @Test
     void cancelBooking_returns200WithCancelledStatus() throws Exception {

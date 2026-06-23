@@ -26,6 +26,16 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 
+    @ExceptionHandler(IdentityServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleIdentityServiceError(IdentityServiceException e) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(OrganizationServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleOrganizationServiceError(OrganizationServiceException e) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
         return error(HttpStatus.CONFLICT, e.getMessage());

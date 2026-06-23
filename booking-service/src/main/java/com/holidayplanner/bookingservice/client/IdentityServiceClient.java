@@ -1,10 +1,15 @@
 package com.holidayplanner.bookingservice.client;
 
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.exception.IdentityServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -31,6 +36,32 @@ public class IdentityServiceClient {
 
     public String getFamilyMemberDisplayName(UUID familyMemberId) {
         return fetchStringField(familyMemberId, "display-name", "name", "display name");
+    }
+
+    public FamilyMemberResponse getFamilyMember(UUID familyMemberId) {
+        String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId;
+        try {
+            return restClient.get()
+                    .uri(url)
+                    .headers(headers -> {
+                        String token = extractCurrentToken();
+                        if (token != null) headers.setBearerAuth(token);
+                    })
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                        throw new IllegalArgumentException("Family member not found or not accessible: " + familyMemberId);
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new IdentityServiceException("Identity service returned server error", null);
+                    })
+                    .body(FamilyMemberResponse.class);
+        } catch (IllegalArgumentException | IdentityServiceException e) {
+            throw e;
+        } catch (ResourceAccessException e) {
+            throw new IdentityServiceException("Identity service unavailable", e);
+        } catch (RestClientException e) {
+            throw new IdentityServiceException("Identity service error: " + e.getMessage(), e);
+        }
     }
 
     private String fetchStringField(UUID familyMemberId, String endpoint, String field, String label) {

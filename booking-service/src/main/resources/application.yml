@@ -42,3 +42,5 @@ services:
     url: ${SERVICES_EVENT_SERVICE_URL:http://localhost:8081}
   identity-service:
     url: ${IDENTITY_SERVICE_URL:http://localhost:8083}
+  organization-service:
+    url: ${ORGANIZATION_SERVICE_URL:http://localhost:8084}

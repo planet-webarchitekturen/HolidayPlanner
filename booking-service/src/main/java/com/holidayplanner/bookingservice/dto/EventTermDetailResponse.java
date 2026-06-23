@@ -21,4 +21,6 @@ public class EventTermDetailResponse {
     private int maxParticipants;
     private String status;
     private UUID organizationId;
+    private Integer minimalAge;
+    private Integer maximalAge;
 }

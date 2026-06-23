@@ -25,6 +25,8 @@ public class EventTermResponse {
     private int maxParticipants;
     private EventTermStatus status;
     private UUID organizationId;
+    private Integer minimalAge;
+    private Integer maximalAge;
 
     public static EventTermResponse from(EventTerm term) {
         EventTermResponse r = new EventTermResponse();
@@ -39,6 +41,8 @@ public class EventTermResponse {
         r.maxParticipants = term.getMaxParticipants();
         r.status = term.getStatus();
         r.organizationId = term.getEvent().getOrganizationId();
+        r.minimalAge = term.getEvent().getMinimalAge();
+        r.maximalAge = term.getEvent().getMaximalAge();
         return r;
     }
 }

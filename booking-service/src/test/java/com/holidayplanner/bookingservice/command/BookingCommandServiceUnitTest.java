@@ -2,8 +2,11 @@ package com.holidayplanner.bookingservice.command;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
 import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
@@ -17,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +49,8 @@ class BookingCommandServiceUnitTest {
     @Mock
     private IdentityServiceClient identityServiceClient;
     @Mock
+    private OrganizationServiceClient organizationServiceClient;
+    @Mock
     private BookingEventProducer bookingEventProducer;
 
     @InjectMocks
@@ -53,13 +59,39 @@ class BookingCommandServiceUnitTest {
     private static final UUID FAMILY_MEMBER_ID = UUID.randomUUID();
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();
     private static final UUID BOOKING_ID = UUID.randomUUID();
+    private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
     private EventTermDetailResponse activeEventTerm(int maxParticipants) {
         EventTermDetailResponse d = new EventTermDetailResponse();
         d.setId(EVENT_TERM_ID);
         d.setStatus("ACTIVE");
         d.setMaxParticipants(maxParticipants);
+        d.setOrganizationId(ORGANIZATION_ID);
+        d.setStartDateTime(LocalDateTime.now().plusDays(14));
+        d.setMinimalAge(6);
+        d.setMaximalAge(16);
         return d;
+    }
+
+    private FamilyMemberResponse familyMemberYearsOld(int years) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(FAMILY_MEMBER_ID);
+        r.setBirthDate(LocalDate.now().minusYears(years));
+        return r;
+    }
+
+    private OrganizationResponse openOrganization() {
+        OrganizationResponse r = new OrganizationResponse();
+        r.setId(ORGANIZATION_ID);
+        r.setBookingStartTime(LocalDateTime.now().minusDays(1));
+        return r;
+    }
+
+    private void givenBookingValidationPasses() {
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
     }
 
     private Booking booking(UUID id, UUID familyMemberId, BookingStatus status, LocalDateTime bookedAt) {
@@ -77,6 +109,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenSlotsAvailable_returnsConfirmed() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(5L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -92,6 +125,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenAtCapacity_returnsWaitlisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(10L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -104,6 +138,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenExactlyOneSlotRemains_returnsConfirmed() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(9L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -116,6 +151,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenMaxZero_alwaysWaitlisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(0));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -136,6 +172,58 @@ class BookingCommandServiceUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not active");
 
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberTooYoung_throwsBadRequestAndNothingPersistedOrPublished() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(5));
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("age requirements");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenBookingWindowNotOpen_throwsConflictAndNothingPersistedOrPublished() {
+        OrganizationResponse futureOrganization = new OrganizationResponse();
+        futureOrganization.setId(ORGANIZATION_ID);
+        futureOrganization.setBookingStartTime(LocalDateTime.now().plusDays(1));
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(futureOrganization);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not open");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenActiveDuplicateExists_throwsConflictAndNothingPersistedOrPublished() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(true);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("active booking");
+
+        verify(identityServiceClient, never()).getFamilyMember(any());
         verify(bookingRepository, never()).save(any());
         verify(bookingEventProducer, never()).publishBookingCreated(any());
     }

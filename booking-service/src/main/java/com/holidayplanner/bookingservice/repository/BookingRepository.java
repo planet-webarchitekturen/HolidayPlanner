@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +24,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findByFamilyMemberId(UUID familyMemberId);
 
     long countByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);
+
+    boolean existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+            UUID familyMemberId,
+            UUID eventTermId,
+            Collection<BookingStatus> statuses);
 
     @Query("SELECT b FROM Booking b WHERE b.familyMemberId = :familyMemberId AND b.status != 'CANCELLED' ORDER BY b.bookedAt DESC")
     List<Booking> findActiveBookingsByFamilyMember(@Param("familyMemberId") UUID familyMemberId);

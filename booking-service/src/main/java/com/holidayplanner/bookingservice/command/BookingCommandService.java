@@ -2,8 +2,11 @@ package com.holidayplanner.bookingservice.command;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
 import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
@@ -18,6 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,7 +35,12 @@ public class BookingCommandService {
     private final BookingRepository bookingRepository;
     private final EventServiceClient eventServiceClient;
     private final IdentityServiceClient identityServiceClient;
+    private final OrganizationServiceClient organizationServiceClient;
     private final BookingEventProducer bookingEventProducer;
+
+    private static final List<BookingStatus> ACTIVE_BOOKING_STATUSES = List.of(
+            BookingStatus.CONFIRMED,
+            BookingStatus.WAITLISTED);
 
     public BookingResponse createBooking(UUID familyMemberId, UUID eventTermId) {
         EventTermDetailResponse eventTerm = eventServiceClient.getEventTerm(eventTermId);
@@ -47,6 +58,15 @@ public class BookingCommandService {
                 throw new AccessDeniedException("Event term belongs to a different organization");
             }
         }
+
+        if (bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                familyMemberId, eventTermId, ACTIVE_BOOKING_STATUSES)) {
+            throw new IllegalStateException("Family member already has an active booking for this event term");
+        }
+
+        FamilyMemberResponse familyMember = identityServiceClient.getFamilyMember(familyMemberId);
+        validateAge(familyMember, eventTerm);
+        validateBookingWindow(eventTerm);
 
         long confirmedCount = bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
 
@@ -71,6 +91,39 @@ public class BookingCommandService {
         bookingEventProducer.publishBookingCreated(payload);
 
         return BookingResponse.from(saved);
+    }
+
+    private void validateAge(FamilyMemberResponse familyMember, EventTermDetailResponse eventTerm) {
+        if (familyMember == null || familyMember.getBirthDate() == null) {
+            throw new IllegalArgumentException("Family member birth date is required");
+        }
+        if (eventTerm.getMinimalAge() == null || eventTerm.getMaximalAge() == null) {
+            throw new IllegalStateException("Event term age limits are missing");
+        }
+
+        LocalDate referenceDate = eventTerm.getStartDateTime() != null
+                ? eventTerm.getStartDateTime().toLocalDate()
+                : LocalDate.now();
+        int age = Period.between(familyMember.getBirthDate(), referenceDate).getYears();
+        if (age < eventTerm.getMinimalAge() || age > eventTerm.getMaximalAge()) {
+            throw new IllegalArgumentException("Family member does not meet age requirements");
+        }
+    }
+
+    private void validateBookingWindow(EventTermDetailResponse eventTerm) {
+        if (eventTerm.getOrganizationId() == null) {
+            throw new IllegalStateException("Event term organizationId is missing");
+        }
+
+        OrganizationResponse organization = organizationServiceClient.getOrganization(eventTerm.getOrganizationId());
+        if (organization == null) {
+            throw new IllegalStateException("Organization response is missing");
+        }
+
+        LocalDateTime bookingStartTime = organization.getBookingStartTime();
+        if (bookingStartTime != null && LocalDateTime.now().isBefore(bookingStartTime)) {
+            throw new IllegalStateException("Booking is not open yet for organization: " + eventTerm.getOrganizationId());
+        }
     }
 
     public BookingResponse cancelBooking(UUID bookingId) {
