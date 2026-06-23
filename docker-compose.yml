@@ -27,7 +27,7 @@ services:
       retries: 5
 
   kafka:
-    image: public.ecr.aws/bitnami/kafka:4.2.0
+    image: public.ecr.aws/soldevelo/kafka:4.2.0
     <<: *default-logging
     deploy:
       resources:

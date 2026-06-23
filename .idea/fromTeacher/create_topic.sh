@@ -5,6 +5,6 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-docker run --rm --net=host public.ecr.aws/bitnami/kafka:4.2.0 \
+docker run --rm --net=host public.ecr.aws/soldevelo/kafka:4.2.0 \
 kafka-topics.sh --bootstrap-server localhost:9092 \
 --create --topic "$1"

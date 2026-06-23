@@ -14,7 +14,7 @@ services:
 
   # A single node kafka cluster
   kafka:
-    image: public.ecr.aws/bitnami/kafka:4.2.0
+    image: public.ecr.aws/soldevelo/kafka:4.2.0
     deploy:
       resources:
         limits:
