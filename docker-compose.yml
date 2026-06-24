@@ -80,6 +80,13 @@ services:
       kafka:
         condition: service_healthy
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    <<: *default-logging
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   booking-service:
     build:
       context: .
@@ -224,12 +231,16 @@ services:
     depends_on:
       kafka:
         condition: service_started
+      mailhog:
+        condition: service_started
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-your-email@gmail.com}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-your-password}
+      MAIL_HOST: ${MAIL_HOST:-mailhog}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS_ENABLE: ${MAIL_SMTP_STARTTLS_ENABLE:-false}
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
