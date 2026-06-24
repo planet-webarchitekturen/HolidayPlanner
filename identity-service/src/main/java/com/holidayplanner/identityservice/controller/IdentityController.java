@@ -184,7 +184,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/caregivers/{caregiverId}")
-    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER','SERVICE')")
     public ResponseEntity<CaregiverResponse> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
         return ResponseEntity.ok(CaregiverResponse.from(queryService.getCaregiverById(caregiverId)));
     }

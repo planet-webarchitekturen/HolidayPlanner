@@ -5,6 +5,7 @@ import com.holidayplanner.eventservice.command.EventTermCommandService;
 import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.query.EventTermQueryService;
 import com.holidayplanner.shared.model.EventTerm;
+import java.util.List;
 import com.holidayplanner.shared.model.EventTermStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +29,9 @@ public class AutoCancelUnderfilledTermsJob {
     @Scheduled(cron = "${event-service.scheduler.auto-cancel-cron:0 0 3 * * *}")
     public void autoCancelUnderfilledTerms() {
         LocalDateTime now = LocalDateTime.now(clock);
-        for (EventTerm term : eventTermQueryService.findActiveTermsStartingWithin24Hours(now)) {
+        List<EventTerm> terms = eventTermQueryService.findActiveTermsStartingWithin24Hours(now);
+        log.info("Auto-cancel job running — found {} active terms starting within 24h of {}", terms.size(), now);
+        for (EventTerm term : terms) {
             try {
                 long confirmed = bookingServicePort.getConfirmedBookingCount(term.getId());
                 if (confirmed < term.getMinParticipants()) {
