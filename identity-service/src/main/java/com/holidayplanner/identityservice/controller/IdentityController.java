@@ -138,7 +138,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/owner-email")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
             @PathVariable("memberId") UUID memberId) {
         String email = queryService.getUserEmailByFamilyMemberId(memberId);
