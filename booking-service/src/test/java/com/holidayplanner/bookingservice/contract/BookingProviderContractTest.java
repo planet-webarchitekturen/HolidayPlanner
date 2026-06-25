@@ -10,6 +10,8 @@ import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.bookingservice.support.TestJwt;
+import com.holidayplanner.shared.model.Booking;
+import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -167,6 +169,22 @@ class BookingProviderContractTest {
     }
 
     // ── Contract: error responses ─────────────────────────────────────────────
+
+    @Test
+    void contract_hasActiveBookings_responseShape() throws Exception {
+        Booking booking = new Booking();
+        booking.setFamilyMemberId(FAMILY_MEMBER_ID);
+        booking.setEventTermId(EVENT_TERM_ID);
+        booking.setStatus(BookingStatus.WAITLISTED);
+        bookingRepository.save(booking);
+
+        send(get("/api/bookings/family-member/" + FAMILY_MEMBER_ID + "/has-active"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(jsonPath("$.hasActiveBookings").value(true))
+                .andExpect(jsonPath("$.activeBookingCount").value(1))
+                .andExpect(jsonPath("$.error").doesNotExist());
+    }
 
     @Test
     void contract_404ErrorShape_whenEventTermNotFound() throws Exception {

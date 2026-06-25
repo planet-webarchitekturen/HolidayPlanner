@@ -3,6 +3,8 @@ package com.holidayplanner.identityservice.controller;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.holidayplanner.identityservice.command.IdentityCommandService;
+import com.holidayplanner.identityservice.exception.ActiveBookingVetoException;
+import com.holidayplanner.identityservice.exception.IdentityExceptionHandler;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
@@ -24,7 +26,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,6 +58,7 @@ class IdentityControllerTest {
                 .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(new IdentityController(commandService, queryService))
+                .setControllerAdvice(new IdentityExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
     }
@@ -170,5 +175,17 @@ class IdentityControllerTest {
                 .contains("ORGANIZATION_TEAM_MEMBER")
                 .contains("ADMIN")
                 .contains("EVENT_OWNER");
+    }
+
+    @Test
+    void removeFamilyMemberWhenActiveBookingExistsReturnsConflict() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        doThrow(new ActiveBookingVetoException("Cannot remove family member with active bookings"))
+                .when(commandService).removeFamilyMember(memberId);
+
+        mockMvc.perform(delete("/api/identity/family-members/{memberId}", memberId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Cannot remove family member with active bookings"));
     }
 }

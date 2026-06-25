@@ -1,7 +1,6 @@
 package com.holidayplanner.identityservice.client;
 
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import com.holidayplanner.identityservice.exception.ActiveBookingVetoException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
@@ -17,13 +16,11 @@ import java.util.UUID;
  * Used for composition queries to enrich user profiles with booking information.
  * 
  * Follows the same pattern as booking-service's EventServiceClient.
- * Implements graceful degradation: if booking-service is unavailable, 
- * returns 0 rather than failing the entire request.
+ * Uses fail-safe behavior for delete veto checks: if booking-service cannot be
+ * reached or returns an error, deletion is rejected.
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
-@NoArgsConstructor(force = true)
 public class BookingServiceClient {
 
     private final RestClient restClient;
@@ -43,30 +40,67 @@ public class BookingServiceClient {
      * Get the count of active (CONFIRMED or WAITLISTED, non-CANCELLED) bookings for a family member.
      * 
      * @param familyMemberId the family member ID
-     * @return count of active bookings, or 0 if booking-service is unavailable
+     * @return count of active bookings
+     * @throws ActiveBookingVetoException if booking-service cannot complete the veto check
      */
     public long getActiveBookingCount(UUID familyMemberId) {
-        String url = bookingServiceUrl + "/api/bookings/family-member/" + familyMemberId;
+        String url = bookingServiceUrl + "/api/bookings/family-member/" + familyMemberId + "/has-active";
         try {
-            var response = restClient.get()
+            ActiveBookingCheckResponse response = restClient.get()
                     .uri(url)
                     .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        log.warn("Booking service returned 4xx for familyMemberId {}: {}", familyMemberId, res.getStatusCode());
+                        throw new ActiveBookingVetoException(
+                                "Cannot verify active bookings for family member " + familyMemberId
+                                        + "; deletion rejected");
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        log.warn("Booking service returned 5xx for familyMemberId {}: {}", familyMemberId, res.getStatusCode());
+                        throw new ActiveBookingVetoException(
+                                "Cannot verify active bookings for family member " + familyMemberId
+                                        + "; deletion rejected");
                     })
-                    .body(Object[].class);
+                    .body(ActiveBookingCheckResponse.class);
             
-            return response != null ? response.length : 0L;
+            if (response == null) {
+                throw new ActiveBookingVetoException(
+                        "Cannot verify active bookings for family member " + familyMemberId
+                                + "; deletion rejected");
+            }
+            return response.getActiveBookingCount();
+        } catch (ActiveBookingVetoException e) {
+            throw e;
         } catch (ResourceAccessException e) {
             log.warn("Booking service unavailable when querying bookings for familyMemberId {}", familyMemberId, e);
-            return 0L;
+            throw new ActiveBookingVetoException(
+                    "Cannot verify active bookings for family member " + familyMemberId
+                            + "; deletion rejected", e);
         } catch (RestClientException e) {
             log.warn("Booking service error for familyMemberId {}: {}", familyMemberId, e.getMessage());
-            return 0L;
+            throw new ActiveBookingVetoException(
+                    "Cannot verify active bookings for family member " + familyMemberId
+                            + "; deletion rejected", e);
+        }
+    }
+
+    public static class ActiveBookingCheckResponse {
+        private boolean hasActiveBookings;
+        private long activeBookingCount;
+
+        public boolean isHasActiveBookings() {
+            return hasActiveBookings;
+        }
+
+        public void setHasActiveBookings(boolean hasActiveBookings) {
+            this.hasActiveBookings = hasActiveBookings;
+        }
+
+        public long getActiveBookingCount() {
+            return activeBookingCount;
+        }
+
+        public void setActiveBookingCount(long activeBookingCount) {
+            this.activeBookingCount = activeBookingCount;
         }
     }
 }

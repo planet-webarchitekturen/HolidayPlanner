@@ -1,6 +1,7 @@
 package com.holidayplanner.bookingservice.controller;
 
 import com.holidayplanner.bookingservice.command.BookingCommandService;
+import com.holidayplanner.bookingservice.dto.ActiveBookingCheckResponse;
 import com.holidayplanner.bookingservice.dto.BookingDetailResponse;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermSummaryResponse;
@@ -54,6 +55,12 @@ public class BookingController {
     @GetMapping("/family-member/{familyMemberId}")
     public ResponseEntity<List<BookingResponse>> getBookingsForFamilyMember(@PathVariable("familyMemberId") UUID familyMemberId) {
         return ResponseEntity.ok(bookingQueryService.getBookingsForFamilyMember(familyMemberId));
+    }
+
+    @GetMapping("/family-member/{familyMemberId}/has-active")
+    public ResponseEntity<ActiveBookingCheckResponse> hasActiveBookingsForFamilyMember(
+            @PathVariable("familyMemberId") UUID familyMemberId) {
+        return ResponseEntity.ok(bookingQueryService.getActiveBookingCheck(familyMemberId));
     }
 
     @GetMapping("/family-member/{familyMemberId}/details")

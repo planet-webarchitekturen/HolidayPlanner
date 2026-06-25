@@ -8,8 +8,11 @@ import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
 import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
+import com.holidayplanner.bookingservice.outbox.OutboxEventRepository;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.bookingservice.support.TestJwt;
+import com.holidayplanner.shared.model.Booking;
+import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +52,9 @@ class BookingControllerComponentTest {
     @Autowired
     private BookingRepository bookingRepository;
 
+    @Autowired
+    private OutboxEventRepository outboxEventRepository;
+
     @MockBean
     private EventServiceClient eventServiceClient;
 
@@ -65,6 +71,7 @@ class BookingControllerComponentTest {
 
     @BeforeEach
     void setUp() {
+        outboxEventRepository.deleteAll();
         bookingRepository.deleteAll();
         when(identityServiceClient.getFamilyMember(any())).thenAnswer(inv ->
                 familyMember(inv.getArgument(0, UUID.class)));
@@ -127,6 +134,14 @@ class BookingControllerComponentTest {
                 .andExpect(jsonPath("$.eventTermId").value(EVENT_TERM_ID.toString()))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.bookedAt").isNotEmpty());
+
+        assertThat(outboxEventRepository.findAll())
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getEventType()).isEqualTo("BookingCreated");
+                    assertThat(event.getTopic()).isEqualTo("holiday-planner.booking.created");
+                    assertThat(event.isProcessed()).isFalse();
+                });
     }
 
     @Test
@@ -300,6 +315,36 @@ class BookingControllerComponentTest {
     // ── GET /api/bookings/event-term/{id}/count ───────────────────────────────
 
     @Test
+    void hasActiveBookings_whenConfirmedBookingExists_returnsTrueWithCount() throws Exception {
+        saveBooking(FAMILY_MEMBER_ID, BookingStatus.CONFIRMED);
+
+        send(get("/api/bookings/family-member/" + FAMILY_MEMBER_ID + "/has-active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasActiveBookings").value(true))
+                .andExpect(jsonPath("$.activeBookingCount").value(1));
+    }
+
+    @Test
+    void hasActiveBookings_whenWaitlistedBookingExists_returnsTrueWithCount() throws Exception {
+        saveBooking(FAMILY_MEMBER_ID, BookingStatus.WAITLISTED);
+
+        send(get("/api/bookings/family-member/" + FAMILY_MEMBER_ID + "/has-active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasActiveBookings").value(true))
+                .andExpect(jsonPath("$.activeBookingCount").value(1));
+    }
+
+    @Test
+    void hasActiveBookings_whenOnlyCancelledBookingsExist_returnsFalseWithZeroCount() throws Exception {
+        saveBooking(FAMILY_MEMBER_ID, BookingStatus.CANCELLED);
+
+        send(get("/api/bookings/family-member/" + FAMILY_MEMBER_ID + "/has-active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasActiveBookings").value(false))
+                .andExpect(jsonPath("$.activeBookingCount").value(0));
+    }
+
+    @Test
     void getBookingCount_returnsConfirmedCount() throws Exception {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
         bookingService_createTwoBookings();
@@ -316,5 +361,13 @@ class BookingControllerComponentTest {
         send(post("/api/bookings")
                 .param("familyMemberId", UUID.randomUUID().toString())
                 .param("eventTermId", EVENT_TERM_ID.toString()));
+    }
+
+    private void saveBooking(UUID familyMemberId, BookingStatus status) {
+        Booking booking = new Booking();
+        booking.setFamilyMemberId(familyMemberId);
+        booking.setEventTermId(UUID.randomUUID());
+        booking.setStatus(status);
+        bookingRepository.save(booking);
     }
 }

@@ -1,6 +1,7 @@
 package com.holidayplanner.identityservice.command;
 
 import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.exception.ActiveBookingVetoException;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
@@ -223,7 +224,26 @@ class IdentityCommandServiceTest {
             when(bookingServiceClient.getActiveBookingCount(memberId)).thenReturn(1L);
 
             assertThatThrownBy(() -> service.removeFamilyMember(memberId))
+                    .isInstanceOf(ActiveBookingVetoException.class)
                     .hasMessageContaining("active bookings");
+
+            verify(familyMemberRepository, never()).deleteById(any());
+            verifyNoInteractions(eventProducer);
+        }
+
+        @Test
+        void removeRejectsDeletionWhenBookingServiceCannotVerifyActiveBookings() {
+            UUID memberId = UUID.randomUUID();
+            FamilyMember member = new FamilyMember();
+            member.setId(memberId);
+            member.setUser(existingUser);
+            when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
+            when(bookingServiceClient.getActiveBookingCount(memberId))
+                    .thenThrow(new ActiveBookingVetoException("Cannot verify active bookings"));
+
+            assertThatThrownBy(() -> service.removeFamilyMember(memberId))
+                    .isInstanceOf(ActiveBookingVetoException.class)
+                    .hasMessageContaining("Cannot verify active bookings");
 
             verify(familyMemberRepository, never()).deleteById(any());
             verifyNoInteractions(eventProducer);

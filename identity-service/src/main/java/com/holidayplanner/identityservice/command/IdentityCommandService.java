@@ -10,6 +10,7 @@ import com.holidayplanner.shared.kafka.payload.UserDeletedPayload;
 import com.holidayplanner.shared.kafka.payload.UserUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.exception.ActiveBookingVetoException;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
@@ -164,7 +165,7 @@ public class IdentityCommandService {
         for (FamilyMember member : familyMemberRepository.findByUser_Id(userId)) {
             long activeBookingCount = bookingServiceClient.getActiveBookingCount(member.getId());
             if (activeBookingCount > 0) {
-                throw new RuntimeException("Cannot delete user with family members that have active bookings. " +
+                throw new ActiveBookingVetoException("Cannot delete user with family members that have active bookings. " +
                         "Cancel all bookings first (" + activeBookingCount + " active bookings found for member " +
                         member.getId() + ")");
             }
@@ -264,7 +265,7 @@ public class IdentityCommandService {
         // Veto check: ensure no active bookings exist for this family member
         long activeBookingCount = bookingServiceClient.getActiveBookingCount(memberId);
         if (activeBookingCount > 0) {
-            throw new RuntimeException("Cannot remove family member with active bookings. " +
+            throw new ActiveBookingVetoException("Cannot remove family member with active bookings. " +
                     "Cancel all bookings first (" + activeBookingCount + " active bookings found)");
         }
         
