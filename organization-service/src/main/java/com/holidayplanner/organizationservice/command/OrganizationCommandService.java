@@ -1,13 +1,14 @@
 package com.holidayplanner.organizationservice.command;
 
 import com.holidayplanner.organizationservice.client.EventServiceClient;
-import com.holidayplanner.organizationservice.kafka.OrganizationDeletionCompletionService;
 import com.holidayplanner.organizationservice.kafka.OrganizationEventProducer;
 import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.organizationservice.repository.SponsorRepository;
 import com.holidayplanner.organizationservice.repository.TeamMemberRepository;
 import com.holidayplanner.shared.kafka.payload.OrganizationCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionStartedPayload;
 import com.holidayplanner.shared.model.Organization;
+import com.holidayplanner.shared.model.OrganizationStatus;
 import com.holidayplanner.shared.model.Sponsor;
 import com.holidayplanner.shared.model.TeamMember;
 import com.holidayplanner.shared.model.TeamMemberRole;
@@ -27,7 +28,6 @@ public class OrganizationCommandService {
     private final SponsorRepository sponsorRepository;
     private final OrganizationEventProducer organizationEventProducer;
     private final EventServiceClient eventServiceClient;
-    private final OrganizationDeletionCompletionService completionService;
 
     public Organization createOrganization(String name, String bankAccount,
                                            LocalDateTime bookingStartTime) {
@@ -95,25 +95,21 @@ public class OrganizationCommandService {
     }
 
     public void deleteOrganization(UUID organizationId) {
-        organizationRepository.findById(organizationId)
+        Organization org = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new RuntimeException("Organization not found: " + organizationId));
-        
-        // Set status to DELETING to start the saga
+
+        if (org.getStatus() != OrganizationStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Organization " + organizationId + " is already being deleted (status " + org.getStatus() + ")");
+        }
+
         org.setStatus(OrganizationStatus.DELETING);
         organizationRepository.save(org);
-        
-        // Publish event to trigger cascade deletions
+
         OrganizationDeletionStartedPayload payload = new OrganizationDeletionStartedPayload(
                 org.getId(),
                 org.getName()
         );
         organizationEventProducer.publishOrganizationDeletionStarted(payload);
-
-        // Guarantees eventual completion even if this organization has no active
-        // terms/bookings to cancel (and therefore no BookingCancelled events will
-        // ever arrive to trigger finalization otherwise).
-        completionService.scheduleFallback(org.getId());
-        eventServiceClient.deleteEventsByOrganization(organizationId);
-        organizationRepository.deleteById(organizationId);
     }
 }

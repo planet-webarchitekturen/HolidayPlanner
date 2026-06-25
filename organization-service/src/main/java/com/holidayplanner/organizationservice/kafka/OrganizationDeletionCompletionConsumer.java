@@ -25,7 +25,7 @@ public class OrganizationDeletionCompletionConsumer {
             topics = "holiday-planner.booking.cancelled",
             groupId = "organization-service-booking-cancelled"
     )
-    public void consumeBookingCancelled(String message) {
+    public void consume(String message) {
         try {
             KafkaEnvelope<BookingCancelledPayload> envelope = objectMapper.readValue(
                     message,

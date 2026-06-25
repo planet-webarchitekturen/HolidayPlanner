@@ -154,7 +154,7 @@ public class BookingCommandService {
 
     public void promoteFromWaitingList(UUID eventTermId, int slots) {
         List<Booking> waitlisted = bookingRepository
-                .findByEventTermIdAndStatusOrderByBookedAtAsc(eventTermId, BookingStatus.WAITLISTED);
+                .findByEventTermIdAndStatus(eventTermId, BookingStatus.WAITLISTED);
 
         String eventName = null;
         String termDate = null;
