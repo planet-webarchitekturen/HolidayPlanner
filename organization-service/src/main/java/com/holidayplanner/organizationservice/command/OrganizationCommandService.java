@@ -1,12 +1,16 @@
 package com.holidayplanner.organizationservice.command;
 
 import com.holidayplanner.organizationservice.client.EventServiceClient;
+import com.holidayplanner.organizationservice.kafka.OrganizationDeletionCompletionService;
 import com.holidayplanner.organizationservice.kafka.OrganizationEventProducer;
 import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.organizationservice.repository.SponsorRepository;
 import com.holidayplanner.organizationservice.repository.TeamMemberRepository;
 import com.holidayplanner.shared.kafka.payload.OrganizationCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionRolledBackPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionStartedPayload;
 import com.holidayplanner.shared.model.Organization;
+import com.holidayplanner.shared.model.OrganizationStatus;
 import com.holidayplanner.shared.model.Sponsor;
 import com.holidayplanner.shared.model.TeamMember;
 import com.holidayplanner.shared.model.TeamMemberRole;
@@ -26,6 +30,7 @@ public class OrganizationCommandService {
     private final SponsorRepository sponsorRepository;
     private final OrganizationEventProducer organizationEventProducer;
     private final EventServiceClient eventServiceClient;
+    private final OrganizationDeletionCompletionService deletionCompletionService;
 
     public Organization createOrganization(String name, String bankAccount,
                                            LocalDateTime bookingStartTime) {
@@ -93,9 +98,60 @@ public class OrganizationCommandService {
     }
 
     public void deleteOrganization(UUID organizationId) {
-        organizationRepository.findById(organizationId)
+        Organization org = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new RuntimeException("Organization not found: " + organizationId));
-        eventServiceClient.deleteEventsByOrganization(organizationId);
-        organizationRepository.deleteById(organizationId);
+
+        if (org.getStatus() != OrganizationStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Organization " + organizationId + " is already being deleted (status " + org.getStatus() + ")");
+        }
+
+        org.setStatus(OrganizationStatus.DELETING);
+        organizationRepository.save(org);
+
+        OrganizationDeletionStartedPayload payload = new OrganizationDeletionStartedPayload(
+                org.getId(),
+                org.getName()
+        );
+        organizationEventProducer.publishOrganizationDeletionStarted(payload);
+
+        // Start the fallback timer so the saga completes even when the org has
+        // no active event terms and therefore receives no BookingCancelled events.
+        deletionCompletionService.scheduleFallback(org.getId());
+    }
+
+    /**
+     * Rolls back a deletion saga that has NOT yet crossed the refund pivot.
+     *
+     * Restores the org to ACTIVE, cancels the completion timer, and publishes
+     * OrganizationDeletionRolledBack so downstream services compensate their own steps.
+     *
+     * @throws IllegalStateException  if the org is not in DELETING state
+     * @throws IllegalStateException  if the refund pivot has already been crossed
+     *                                (at least one PAID payment was refunded — money left the system)
+     */
+    public void rollbackDeletion(UUID organizationId) {
+        Organization org = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new RuntimeException("Organization not found: " + organizationId));
+
+        if (org.getStatus() != OrganizationStatus.DELETING) {
+            throw new IllegalStateException(
+                    "Cannot roll back: organization " + organizationId + " is not in DELETING state (current: " + org.getStatus() + ")");
+        }
+
+        if (deletionCompletionService.isPivotCrossed(organizationId)) {
+            throw new IllegalStateException(
+                    "Cannot roll back: at least one PAID payment has already been refunded for organization "
+                            + organizationId + ". The saga has passed the refund pivot and must complete forward.");
+        }
+
+        // Cancel the pending completion timer before changing state.
+        deletionCompletionService.cancelPendingFinalization(organizationId);
+
+        org.setStatus(OrganizationStatus.ACTIVE);
+        organizationRepository.save(org);
+
+        organizationEventProducer.publishOrganizationDeletionRolledBack(
+                new OrganizationDeletionRolledBackPayload(org.getId(), org.getName()));
     }
 }

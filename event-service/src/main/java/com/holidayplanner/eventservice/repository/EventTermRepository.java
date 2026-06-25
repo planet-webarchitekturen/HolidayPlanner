@@ -19,8 +19,13 @@ public interface EventTermRepository extends JpaRepository<EventTerm, UUID> {
 
     List<EventTerm> findByStatus(EventTermStatus status);
 
+    List<EventTerm> findByEvent_IdAndStatus(UUID eventId, EventTermStatus status);
+
     @Query("SELECT t FROM EventTerm t JOIN FETCH t.event WHERE t.id = :id")
     Optional<EventTerm> findByIdWithEvent(@Param("id") UUID id);
+
+    @Query("SELECT t FROM EventTerm t JOIN FETCH t.event e WHERE e.organizationId = :organizationId AND t.cancelledBySaga = true")
+    List<EventTerm> findCancelledBySagaForOrganization(@Param("organizationId") UUID organizationId);
 
     /**
      * ACTIVE terms whose start is on/before {@code before} — includes past terms.

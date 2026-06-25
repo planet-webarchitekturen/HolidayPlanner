@@ -3,6 +3,7 @@ package com.holidayplanner.bookingservice.kafka;
 import com.holidayplanner.bookingservice.outbox.OutboxService;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,12 +55,28 @@ class BookingEventProducerTest {
                 "parent@example.test",
                 "Summer Camp",
                 "2026-07-01T09:00:00",
-                "parent");
+                "parent",
+                UUID.randomUUID(),
+                UUID.randomUUID());
 
         producer.publishBookingCancelled(payload);
 
         verify(outboxService).record("Booking", bookingId.toString(),
                 "BookingCancelled", "holiday-planner.booking.cancelled", payload);
+    }
+
+    @Test
+    void publishBookingRestoredRecordsOutboxEvent() {
+        UUID bookingId = UUID.randomUUID();
+        BookingRestoredPayload payload = new BookingRestoredPayload(
+                bookingId,
+                UUID.randomUUID(),
+                UUID.randomUUID());
+
+        producer.publishBookingRestored(payload);
+
+        verify(outboxService).record("Booking", bookingId.toString(),
+                "BookingRestored", "holiday-planner.booking.restored", payload);
     }
 
     @Test

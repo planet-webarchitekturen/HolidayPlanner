@@ -42,6 +42,6 @@ public class IdentitySecurityService {
     }
 
     private JwtClaims getClaims(Authentication auth) {
-        return (JwtClaims) auth.getPrincipal();
+        return JwtClaims.fromAuthentication(auth);
     }
 }

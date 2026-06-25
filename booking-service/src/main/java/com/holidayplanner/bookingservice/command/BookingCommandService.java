@@ -12,6 +12,7 @@ import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
@@ -141,18 +142,24 @@ public class BookingCommandService {
         String parentEmail = null;
         String eventName = null;
         String termDate = null;
+        UUID eventTermOrganizationId = null;
+        UUID eventTermEventId = null;
         try {
             parentEmail = identityServiceClient.getOwnerEmail(booking.getFamilyMemberId());
             EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
             eventName = term.getEventName();
             termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            eventTermOrganizationId = term.getOrganizationId();
+            eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
         }
         BookingCancelledPayload payload = new BookingCancelledPayload(
-                booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                parentEmail, eventName, termDate, "parent");
-        bookingEventProducer.publishBookingCancelled(payload);
+            booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
+            parentEmail, eventName, termDate, "parent",
+            eventTermOrganizationId, eventTermEventId);
+        
+            bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
         if (eventTermId != null) {
@@ -165,20 +172,28 @@ public class BookingCommandService {
     public void cancelAllBookings(UUID eventTermId) {
         String eventName = null;
         String termDate = null;
+        UUID organizationId = null;
+        UUID eventTermEventId = null;
         try {
             EventTermDetailResponse term = eventServiceClient.getEventTerm(eventTermId);
             eventName = term.getEventName();
             termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            organizationId = term.getOrganizationId();
+            eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not fetch event term for cancelAllBookings: {}", e.getMessage());
         }
         final String resolvedEventName = eventName;
         final String resolvedTermDate = termDate;
+        final UUID resolvedOrganizationId = organizationId;
+        final UUID resolvedEventTermEventId = eventTermEventId;
 
         List<Booking> active = bookingRepository.findByEventTermId(eventTermId).stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .toList();
         active.forEach(b -> {
+            b.setSagaCancelled(true);
+            b.setSagaCancelledOriginalStatus(b.getStatus());
             b.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(b);
             String parentEmail = null;
@@ -187,10 +202,28 @@ public class BookingCommandService {
             } catch (Exception e) {
                 log.warn("Could not fetch parentEmail for cancelAllBookings booking {}: {}", b.getId(), e.getMessage());
             }
-            BookingCancelledPayload payload = new BookingCancelledPayload(
+                BookingCancelledPayload payload = new BookingCancelledPayload(
                     b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                    parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled");
+                    parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled",
+                    resolvedOrganizationId, resolvedEventTermEventId);
             bookingEventProducer.publishBookingCancelled(payload);
+        });
+    }
+
+    public void restoreAllBookingsForTerm(UUID eventTermId, UUID organizationId) {
+        List<Booking> sagaBookings = bookingRepository.findByEventTermIdAndSagaCancelledTrue(eventTermId);
+        sagaBookings.forEach(b -> {
+            BookingStatus originalStatus = b.getSagaCancelledOriginalStatus();
+            if (originalStatus == null) {
+                originalStatus = BookingStatus.CONFIRMED;
+            }
+            b.setStatus(originalStatus);
+            b.setSagaCancelled(false);
+            b.setSagaCancelledOriginalStatus(null);
+            bookingRepository.save(b);
+            bookingEventProducer.publishBookingRestored(
+                    new BookingRestoredPayload(b.getId(), eventTermId, organizationId));
+            log.info("Restored booking {} to {} (org rollback)", b.getId(), originalStatus);
         });
     }
 

@@ -43,6 +43,10 @@ public class EventTerm {
     @Column(nullable = false)
     private EventTermStatus status = EventTermStatus.DRAFT;
 
+    /** True when this term was set to CANCELLED by the organization-deletion saga (CancellationActor.SYSTEM). */
+    @Column(nullable = false)
+    private boolean cancelledBySaga = false;
+
     // References to caregivers (managed by IdentityService)
     @ElementCollection(fetch = jakarta.persistence.FetchType.EAGER)
     @CollectionTable(name = "event_term_caregivers", joinColumns = @JoinColumn(name = "event_term_id"))

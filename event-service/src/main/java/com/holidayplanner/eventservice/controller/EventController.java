@@ -101,6 +101,7 @@ public class EventController {
     // --- Event terms (commands) ---
 
     @PostMapping("/{eventId}/terms")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<EventTermResponse> createEventTerm(
             @PathVariable("eventId") UUID eventId,
             @RequestBody CreateEventTermRequest request) {
@@ -109,6 +110,7 @@ public class EventController {
     }
 
     @PatchMapping("/terms/{eventTermId}/status")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<EventTermResponse> changeEventTermStatus(
             @PathVariable("eventTermId") UUID eventTermId,
             @RequestBody ChangeStatusRequest request) {
@@ -117,6 +119,7 @@ public class EventController {
     }
 
     @PatchMapping("/terms/{eventTermId}/capacity")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<EventTermResponse> updateEventTermCapacity(
             @PathVariable("eventTermId") UUID eventTermId,
             @RequestBody UpdateCapacityRequest request) {
@@ -125,6 +128,7 @@ public class EventController {
     }
 
     @PostMapping("/terms/{eventTermId}/caregivers/{caregiverId}")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<EventTermResponse> assignCaregiver(
             @PathVariable("eventTermId") UUID eventTermId,
             @PathVariable("caregiverId") UUID caregiverId) {
@@ -132,6 +136,7 @@ public class EventController {
     }
 
     @PostMapping("/terms/{eventTermId}/messages")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<Void> sendMessageToParticipants(
             @PathVariable("eventTermId") UUID eventTermId,
             @RequestBody SendMessageRequest request) {
@@ -143,6 +148,7 @@ public class EventController {
     // --- Remarks ---
 
     @PostMapping("/terms/{eventTermId}/remarks")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'SERVICE')")
     public ResponseEntity<RemarkResponse> createRemark(
             @PathVariable("eventTermId") UUID eventTermId,
             @RequestBody CreateRemarkRequest request) {
@@ -151,6 +157,7 @@ public class EventController {
     }
 
     @GetMapping("/terms/{eventTermId}/remarks")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'SERVICE')")
     public ResponseEntity<List<RemarkResponse>> getRemarks(@PathVariable("eventTermId") UUID eventTermId) {
         return ResponseEntity.ok(remarkQueryService.getRemarks(eventTermId));
     }

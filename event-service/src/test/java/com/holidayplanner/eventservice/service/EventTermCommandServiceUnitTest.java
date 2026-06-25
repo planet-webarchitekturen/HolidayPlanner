@@ -142,4 +142,28 @@ class EventTermCommandServiceUnitTest {
         assertThat(payload.getValue().getSubject()).isEqualTo("Subject");
         assertThat(payload.getValue().getBody()).isEqualTo("Hello");
     }
+
+    // ── saga cancellation stamp ───────────────────────────────────────────────
+
+    @Test
+    void changeStatus_systemCancelStamps_cancelledBySagaTrue() {
+        term.setStatus(EventTermStatus.ACTIVE);
+        when(eventTermRepository.findByIdWithEvent(termId)).thenReturn(Optional.of(term));
+        when(eventTermRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        commandService.changeEventTermStatus(termId, EventTermStatus.CANCELLED, CancellationActor.SYSTEM);
+
+        assertThat(term.isCancelledBySaga()).isTrue();
+    }
+
+    @Test
+    void changeStatus_nonSystemCancelDoesNotStamp_cancelledBySagaFalse() {
+        term.setStatus(EventTermStatus.ACTIVE);
+        when(eventTermRepository.findByIdWithEvent(termId)).thenReturn(Optional.of(term));
+        when(eventTermRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        commandService.changeEventTermStatus(termId, EventTermStatus.CANCELLED, CancellationActor.EVENT_OWNER);
+
+        assertThat(term.isCancelledBySaga()).isFalse();
+    }
 }
