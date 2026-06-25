@@ -80,6 +80,13 @@ class BookingCommandServiceUnitTest {
         return r;
     }
 
+    private FamilyMemberResponse familyMemberAgeOnTerm(EventTermDetailResponse eventTerm, int years) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(FAMILY_MEMBER_ID);
+        r.setBirthDate(eventTerm.getStartDateTime().toLocalDate().minusYears(years));
+        return r;
+    }
+
     private OrganizationResponse openOrganization() {
         OrganizationResponse r = new OrganizationResponse();
         r.setId(ORGANIZATION_ID);
@@ -192,6 +199,61 @@ class BookingCommandServiceUnitTest {
     }
 
     @Test
+    void createBooking_whenFamilyMemberExactlyMinimalAge_returnsConfirmed() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMinimalAge()));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberExactlyMaximalAge_returnsConfirmed() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMaximalAge()));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberTooOld_throwsBadRequestAndNothingPersistedOrPublished() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMaximalAge() + 1));
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("age requirements");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
     void createBooking_whenBookingWindowNotOpen_throwsConflictAndNothingPersistedOrPublished() {
         OrganizationResponse futureOrganization = new OrganizationResponse();
         futureOrganization.setId(ORGANIZATION_ID);
@@ -212,6 +274,27 @@ class BookingCommandServiceUnitTest {
     }
 
     @Test
+    void createBooking_whenBookingStartTimeIsMissing_treatsBookingWindowAsOpen() {
+        OrganizationResponse organizationWithoutBookingWindow = new OrganizationResponse();
+        organizationWithoutBookingWindow.setId(ORGANIZATION_ID);
+        organizationWithoutBookingWindow.setBookingStartTime(null);
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(organizationWithoutBookingWindow);
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
     void createBooking_whenActiveDuplicateExists_throwsConflictAndNothingPersistedOrPublished() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
         when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
@@ -226,6 +309,29 @@ class BookingCommandServiceUnitTest {
         verify(identityServiceClient, never()).getFamilyMember(any());
         verify(bookingRepository, never()).save(any());
         verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenOnlyCancelledBookingExists_allowsNewBooking() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingRepository).existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED));
+        verify(bookingEventProducer).publishBookingCreated(any());
     }
 
     @Test

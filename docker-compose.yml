@@ -105,6 +105,7 @@ services:
       DB_PASSWORD: postgres
       SERVICES_EVENT_SERVICE_URL: http://event-service:8081
       IDENTITY_SERVICE_URL: http://identity-service:8083
+      ORGANIZATION_SERVICE_URL: http://organization-service:8084
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
 
