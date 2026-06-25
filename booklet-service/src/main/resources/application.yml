@@ -2,6 +2,14 @@ spring:
   application:
     name: booklet-service
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: booklet-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
 server:
   port: 8087
 
@@ -16,3 +24,8 @@ services:
     url: ${SERVICES_ORGANIZATION_SERVICE_URL:http://localhost:8084}
   event-service:
     url: ${SERVICES_EVENT_SERVICE_URL:http://localhost:8081}
+  booking-service:
+    url: ${SERVICES_BOOKING_SERVICE_URL:http://localhost:8082}
+
+booklet:
+  storage-dir: ${BOOKLET_STORAGE_DIR:${java.io.tmpdir}/holidayplanner-booklets}

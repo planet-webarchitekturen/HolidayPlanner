@@ -80,8 +80,8 @@ services:
       kafka:
         condition: service_healthy
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
+  mailpit:
+    image: axllent/mailpit
     <<: *default-logging
     ports:
       - "1025:1025"
@@ -138,7 +138,6 @@ services:
       DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
-      NOTIFICATION_SERVICE_URL: http://notification-service:8089
       BOOKING_SERVICE_URL: http://booking-service:8082
       IDENTITY_SERVICE_URL: http://identity-service:8083
 
@@ -229,13 +228,24 @@ services:
     ports:
       - "8090:8089"
     depends_on:
+      postgres:
+        condition: service_healthy
       kafka:
         condition: service_started
-      mailhog:
+      mailpit:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      booklet-service:
         condition: service_started
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MAIL_HOST: ${MAIL_HOST:-mailhog}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: notification_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
       MAIL_PORT: ${MAIL_PORT:-1025}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
@@ -243,6 +253,8 @@ services:
       MAIL_SMTP_STARTTLS_ENABLE: ${MAIL_SMTP_STARTTLS_ENABLE:-false}
       JWT_SECRET: ${JWT_SECRET:-holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
+      SERVICES_BOOKLET_SERVICE_URL: http://booklet-service:8087
+      SERVICES_BOOKING_SERVICE_URL: http://booking-service:8082
 
   booklet-service:
     build:
@@ -256,6 +268,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
+      booking-service:
+        condition: service_started
     environment:
       DB_HOST: postgres
       DB_NAME: booklet_db
@@ -265,6 +281,7 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET:-holidayplanner-internal-service-secret}
       SERVICES_ORGANIZATION_SERVICE_URL: http://organization-service:8084
       SERVICES_EVENT_SERVICE_URL: http://event-service:8081
+      SERVICES_BOOKING_SERVICE_URL: http://booking-service:8082
 
 volumes:
   postgres_data:

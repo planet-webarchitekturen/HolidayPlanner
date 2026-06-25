@@ -1,6 +1,7 @@
 package com.holidayplanner.eventservice.scheduler;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Disabled;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -10,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * Voraussetzung: Postgres + Kafka müssen laufen.
  */
 @SpringBootTest
+@Disabled("Manual test: requires real Postgres and Kafka")
 class RunAutoCancelManualTest {
 
     @Autowired
