@@ -50,7 +50,7 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_whenActiveResponse_parsesAllFields() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(okJson("""
                         {
                           "id": "%s",
@@ -69,7 +69,7 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_whenDraftResponse_parsesStatus() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(okJson("""
                         {
                           "id": "%s",
@@ -87,7 +87,7 @@ class EventServiceConsumerContractTest {
     void getEventTerm_whenResponseHasExtraFields_stillParsesCorrectly() {
         // event-service may add new fields in future; client must not break
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(okJson("""
                         {
                           "id": "%s",
@@ -109,7 +109,7 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_when404_throwsEventTermNotFoundException() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(aResponse().withStatus(404)));
 
         assertThatThrownBy(() -> eventServiceClient.getEventTerm(id))
@@ -120,7 +120,7 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_when500_throwsEventServiceException() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(aResponse().withStatus(500)));
 
         assertThatThrownBy(() -> eventServiceClient.getEventTerm(id))
@@ -130,7 +130,7 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_when503_throwsEventServiceException() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(aResponse().withStatus(503)));
 
         assertThatThrownBy(() -> eventServiceClient.getEventTerm(id))
@@ -154,7 +154,7 @@ class EventServiceConsumerContractTest {
     void getEventTerm_whenTimeout_throwsEventServiceException() {
         UUID id = UUID.randomUUID();
         // WireMock fixed-delay longer than any reasonable read timeout
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withFixedDelay(5_000)));
@@ -180,13 +180,13 @@ class EventServiceConsumerContractTest {
     @Test
     void getEventTerm_sendsGetToCorrectPath() {
         UUID id = UUID.randomUUID();
-        wm.stubFor(get(urlEqualTo("/api/event-terms/" + id))
+        wm.stubFor(get(urlEqualTo("/api/events/terms/" + id))
                 .willReturn(okJson("""
                         {"id":"%s","status":"ACTIVE","maxParticipants":10}
                         """.formatted(id))));
 
         eventServiceClient.getEventTerm(id);
 
-        wm.verify(1, getRequestedFor(WireMock.urlEqualTo("/api/event-terms/" + id)));
+        wm.verify(1, getRequestedFor(WireMock.urlEqualTo("/api/events/terms/" + id)));
     }
 }

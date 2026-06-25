@@ -8,12 +8,14 @@ import com.holidayplanner.eventservice.client.NotificationServiceClient;
 import com.holidayplanner.eventservice.dto.CreateEventRequest;
 import com.holidayplanner.eventservice.dto.CreateEventTermRequest;
 import com.holidayplanner.eventservice.kafka.EventTermEventProducer;
+import com.holidayplanner.eventservice.support.TestJwt;
 import com.holidayplanner.shared.model.PaymentMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -60,6 +62,8 @@ class EventProviderContractTest {
     @MockBean
     private NotificationServiceClient notificationServiceClient;
 
+    private static final String BEARER = "Bearer " + TestJwt.token("EVENT_OWNER", "ADMIN");
+
     @Test
     void getEventTerm_returnsExpectedFieldNames() throws Exception {
         when(bookingServiceClient.getConfirmedBookingCount(any())).thenReturn(0L);
@@ -78,6 +82,7 @@ class EventProviderContractTest {
         create.setPictureUrl(null);
 
         String createBody = mockMvc.perform(post("/api/events")
+                        .header(HttpHeaders.AUTHORIZATION, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(create)))
                 .andExpect(status().isCreated())
@@ -93,6 +98,7 @@ class EventProviderContractTest {
         termReq.setMaxParticipants(8);
 
         String termBody = mockMvc.perform(post("/api/events/{eventId}/terms", eventId)
+                        .header(HttpHeaders.AUTHORIZATION, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(termReq)))
                 .andExpect(status().isCreated())
@@ -100,7 +106,8 @@ class EventProviderContractTest {
 
         UUID termId = UUID.fromString(objectMapper.readTree(termBody).get("id").asText());
 
-        mockMvc.perform(get("/api/events/terms/{id}", termId))
+        mockMvc.perform(get("/api/events/terms/{id}", termId)
+                        .header(HttpHeaders.AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.maxParticipants").exists())

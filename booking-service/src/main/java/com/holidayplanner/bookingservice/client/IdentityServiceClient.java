@@ -17,12 +17,15 @@ public class IdentityServiceClient {
 
     private final RestClient restClient;
     private final String identityServiceUrl;
+    private final String serviceSecret;
 
     public IdentityServiceClient(
             RestClient.Builder restClientBuilder,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret,
             @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl) {
         this.restClient = restClientBuilder.build();
         this.identityServiceUrl = identityServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     public String getOwnerEmail(UUID familyMemberId) {
@@ -39,10 +42,7 @@ public class IdentityServiceClient {
             @SuppressWarnings("unchecked")
             Map<String, String> response = restClient.get()
                     .uri(url)
-                    .headers(headers -> {
-                        String token = extractCurrentToken();
-                        if (token != null) headers.setBearerAuth(token);
-                    })
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(Map.class);
             return response != null ? response.get(field) : null;

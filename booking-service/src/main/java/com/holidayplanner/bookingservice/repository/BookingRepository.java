@@ -17,6 +17,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     List<Booking> findByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);
 
+    // FIFO waitlist order: oldest booking is promoted first.
+    List<Booking> findByEventTermIdAndStatusOrderByBookedAtAsc(UUID eventTermId, BookingStatus status);
+
     List<Booking> findByFamilyMemberId(UUID familyMemberId);
 
     long countByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);

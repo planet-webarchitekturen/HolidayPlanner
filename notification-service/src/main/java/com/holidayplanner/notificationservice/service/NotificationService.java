@@ -17,11 +17,16 @@ public class NotificationService {
 
     // Send a single email
     public void sendEmail(String to, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
-        log.info("Email delivery disabled; would send email to {} with subject '{}'", to, subject);
+        if (to == null || to.isBlank()) {
+            log.warn("Skipping email — recipient is null, subject: '{}'", subject);
+            return;
+        }
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setTo(to);
+//        message.setSubject(subject);
+//        message.setText(body);
+//        mailSender.send(message);
+        log.info("[EMAIL] To: {} | Subject: {} | Body: {}", to, subject, body);
     }
 
     // Send bulk emails to multiple recipients

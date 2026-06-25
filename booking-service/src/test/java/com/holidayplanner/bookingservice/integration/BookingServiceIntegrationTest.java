@@ -1,12 +1,15 @@
 package com.holidayplanner.bookingservice.integration;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
+import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.command.BookingCommandService;
+import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
+import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
-import com.holidayplanner.bookingservice.service.BookingService;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,22 +28,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
- * B) Integration tests for BookingService (DDD service class) with IPC via mocks.
- * Uses a real H2 database via @ActiveProfiles("test").
- * EventServiceClient (the IPC dependency) is replaced by a @MockBean.
+ * Integration tests for the CQRS {@link BookingCommandService} with real H2 persistence
+ * (via @ActiveProfiles("test")). The IPC dependencies (event-service, identity-service) and the
+ * Kafka producer are replaced by @MockBean so the test does not need any running infrastructure.
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class BookingServiceIntegrationTest {
 
     @Autowired
-    private BookingService bookingService;
+    private BookingCommandService bookingCommandService;
 
     @Autowired
     private BookingRepository bookingRepository;
 
     @MockBean
     private EventServiceClient eventServiceClient;
+
+    @MockBean
+    private IdentityServiceClient identityServiceClient;
+
+    @MockBean
+    private BookingEventProducer bookingEventProducer;
 
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();
 
@@ -64,7 +73,7 @@ class BookingServiceIntegrationTest {
         UUID familyMemberId = UUID.randomUUID();
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
 
-        Booking result = bookingService.createBooking(familyMemberId, EVENT_TERM_ID);
+        BookingResponse result = bookingCommandService.createBooking(familyMemberId, EVENT_TERM_ID);
 
         assertThat(result.getId()).isNotNull();
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
@@ -79,9 +88,9 @@ class BookingServiceIntegrationTest {
     void createBooking_whenCapacityFull_persistsAsWaitlisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(2));
 
-        bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
-        bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
-        Booking third = bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        BookingResponse third = bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
 
         assertThat(third.getStatus()).isEqualTo(BookingStatus.WAITLISTED);
         assertThat(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).isEqualTo(2);
@@ -95,7 +104,7 @@ class BookingServiceIntegrationTest {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID))
                 .thenThrow(new EventTermNotFoundException(EVENT_TERM_ID));
 
-        assertThatThrownBy(() -> bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
+        assertThatThrownBy(() -> bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
                 .isInstanceOf(EventTermNotFoundException.class);
 
         assertThat(bookingRepository.count()).isZero();
@@ -107,7 +116,7 @@ class BookingServiceIntegrationTest {
                 .thenThrow(new EventServiceException("Event service unavailable",
                         new RuntimeException("Connection refused")));
 
-        assertThatThrownBy(() -> bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
+        assertThatThrownBy(() -> bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
                 .isInstanceOf(EventServiceException.class)
                 .hasMessageContaining("unavailable");
 
@@ -121,7 +130,7 @@ class BookingServiceIntegrationTest {
         draft.setMaxParticipants(10);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(draft);
 
-        assertThatThrownBy(() -> bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
+        assertThatThrownBy(() -> bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(bookingRepository.count()).isZero();
@@ -130,14 +139,12 @@ class BookingServiceIntegrationTest {
     @Test
     void createBooking_whenEventServiceReturnsPartialResponse_stillPersists() {
         // EventService returns a response with only the required fields; optional fields are null.
-        // Service must not crash on a partial (but valid) response.
         EventTermDetailResponse partial = new EventTermDetailResponse();
         partial.setStatus("ACTIVE");
         partial.setMaxParticipants(5);
-        // startDate, endDate, eventId are intentionally left null
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(partial);
 
-        Booking result = bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        BookingResponse result = bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
 
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
     }
@@ -148,13 +155,13 @@ class BookingServiceIntegrationTest {
     void cancelBooking_promotesFirstWaitlistedBooking() {
         when(eventServiceClient.getEventTerm(any())).thenReturn(activeEventTerm(1));
 
-        Booking confirmed = bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
-        Booking waitlisted = bookingService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        BookingResponse confirmed = bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        BookingResponse waitlisted = bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
 
         assertThat(confirmed.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         assertThat(waitlisted.getStatus()).isEqualTo(BookingStatus.WAITLISTED);
 
-        bookingService.cancelBooking(Objects.requireNonNull(confirmed.getId()));
+        bookingCommandService.cancelBooking(Objects.requireNonNull(confirmed.getId()));
 
         Booking promoted = bookingRepository.findById(Objects.requireNonNull(waitlisted.getId())).orElseThrow();
         assertThat(promoted.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
@@ -167,7 +174,7 @@ class BookingServiceIntegrationTest {
     void cancelBooking_whenBookingNotFound_throwsBookingNotFoundException() {
         UUID unknownId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> bookingService.cancelBooking(unknownId))
+        assertThatThrownBy(() -> bookingCommandService.cancelBooking(unknownId))
                 .isInstanceOf(BookingNotFoundException.class)
                 .hasMessageContaining(unknownId.toString());
     }

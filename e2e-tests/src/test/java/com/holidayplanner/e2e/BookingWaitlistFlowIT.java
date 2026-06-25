@@ -155,20 +155,57 @@ class BookingWaitlistFlowIT {
         UUID benBookingId = uuid(benBooking, "id");
         assertEquals("WAITLISTED", benBooking.get("status").asText(), "second booking must enter waiting list");
 
-        delete(8082, "/api/bookings/" + annaBookingId, userToken);
+        // Story 5: raising the term capacity must promote the waitlisted booking via the
+        // CapacityIncreased Kafka event consumed by booking-service (CapacityIncreasedConsumer).
+        patchJson(
+                8081,
+                "/api/events/terms/" + termId + "/capacity",
+                adminToken,
+                Map.of("minParticipants", 1, "maxParticipants", 2));
 
-        JsonNode promotedBen = eventually("Ben promoted from waitlist", () -> {
+        JsonNode benPromotedByCapacity = eventually("Ben promoted after capacity increase", () -> {
             JsonNode booking = getJsonOrNull(8082, "/api/bookings/" + benBookingId, userToken);
             return booking != null && "CONFIRMED".equals(booking.get("status").asText()) ? booking : null;
         });
+        assertEquals("CONFIRMED", benPromotedByCapacity.get("status").asText(),
+                "capacity increase should promote the waitlisted booking");
 
-        assertEquals("CONFIRMED", promotedBen.get("status").asText(), "waitlisted booking should be promoted");
+        // Term is now full again (Anna + Ben = max 2); a third booking joins the waiting list.
+        JsonNode cara = postForm(
+                8083,
+                "/api/identity/users/" + userId + "/family-members",
+                userToken,
+                Map.of(
+                        "firstName", "Cara",
+                        "lastName", "Demo",
+                        "birthDate", LocalDate.now().minusYears(8).toString(),
+                        "zip", "6900"));
+        UUID caraId = uuid(cara, "id");
+
+        JsonNode caraBooking = postForm(
+                8082,
+                "/api/bookings",
+                userToken,
+                Map.of("familyMemberId", caraId.toString(), "eventTermId", termId.toString()));
+        UUID caraBookingId = uuid(caraBooking, "id");
+        assertEquals("WAITLISTED", caraBooking.get("status").asText(), "third booking must enter waiting list");
+
+        // Story 2: cancelling a confirmed booking promotes the oldest waitlisted booking (FIFO).
+        delete(8082, "/api/bookings/" + annaBookingId, userToken);
+
+        JsonNode promotedCara = eventually("Cara promoted from waitlist after cancel", () -> {
+            JsonNode booking = getJsonOrNull(8082, "/api/bookings/" + caraBookingId, userToken);
+            return booking != null && "CONFIRMED".equals(booking.get("status").asText()) ? booking : null;
+        });
+        assertEquals("CONFIRMED", promotedCara.get("status").asText(), "waitlisted booking should be promoted");
 
         List<JsonNode> bookings = getList(8082, "/api/bookings/event-term/" + termId, userToken);
         assertTrue(bookings.stream().anyMatch(b ->
                 annaBookingId.toString().equals(b.get("id").asText()) && "CANCELLED".equals(b.get("status").asText())));
         assertTrue(bookings.stream().anyMatch(b ->
                 benBookingId.toString().equals(b.get("id").asText()) && "CONFIRMED".equals(b.get("status").asText())));
+        assertTrue(bookings.stream().anyMatch(b ->
+                caraBookingId.toString().equals(b.get("id").asText()) && "CONFIRMED".equals(b.get("status").asText())));
     }
 
     private static void waitForHealth(String service, int port, String path) {

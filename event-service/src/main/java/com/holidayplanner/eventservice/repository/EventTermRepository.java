@@ -25,6 +25,13 @@ public interface EventTermRepository extends JpaRepository<EventTerm, UUID> {
     Optional<EventTerm> findByIdWithEvent(@Param("id") UUID id);
 
     /**
+     * ACTIVE terms whose start is on/before {@code before} — includes past terms.
+     */
+    @Query("SELECT DISTINCT t FROM EventTerm t JOIN FETCH t.event e WHERE t.status = 'ACTIVE' "
+            + "AND t.startDateTime <= :before")
+    List<EventTerm> findActiveTermsStartingBefore(@Param("before") LocalDateTime before);
+
+    /**
      * ACTIVE terms whose start is strictly after {@code fromExclusive} and on/before {@code toInclusive}.
      */
     @Query("SELECT DISTINCT t FROM EventTerm t JOIN FETCH t.event e WHERE t.status = 'ACTIVE' "

@@ -44,7 +44,7 @@ public class EventTerm {
     private EventTermStatus status = EventTermStatus.DRAFT;
 
     // References to caregivers (managed by IdentityService)
-    @ElementCollection
+    @ElementCollection(fetch = jakarta.persistence.FetchType.EAGER)
     @CollectionTable(name = "event_term_caregivers", joinColumns = @JoinColumn(name = "event_term_id"))
     @Column(name = "caregiver_id")
     private List<UUID> caregiverIds = new ArrayList<>();

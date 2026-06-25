@@ -65,7 +65,7 @@ public class EventController {
     // --- Events (commands) ---
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN', 'USER')")
     public ResponseEntity<EventResponse> createEvent(@RequestBody CreateEventRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventCommandService.createEvent(request));
     }

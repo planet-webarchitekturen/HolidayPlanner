@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -25,10 +26,11 @@ public class DayBeforeNotificationsJob {
     private final BookingServicePort bookingServicePort;
     private final IdentityServicePort identityServicePort;
     private final EventTermEventPublisher eventTermEventPublisher;
+    private final Clock clock;
     // Runs at 02:15 AM every day, gets all ACTIVE event terms starting the next day, fetches participant names and caregiver emails and publishes a Kafka event for each caregiver.
     @Scheduled(cron = "${event-service.scheduler.day-before-cron:0 15 2 * * *}")
     public void scheduleDayBeforeNotifications() {
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
         List<EventTerm> terms = eventTermQueryService.findActiveTermsStartingOn(tomorrow);
         for (EventTerm term : terms) {
             try {
