@@ -39,6 +39,7 @@ class IdentityServiceConsumerContractTest {
     void setUp() {
         identityServiceClient = new IdentityServiceClient(
                 RestClient.builder(),
+                "test-service-secret",
                 wm.baseUrl()
         );
     }
@@ -110,6 +111,7 @@ class IdentityServiceConsumerContractTest {
     void getFamilyMember_whenConnectionRefused_throwsIdentityServiceException() {
         IdentityServiceClient unreachable = new IdentityServiceClient(
                 RestClient.builder(),
+                "test-service-secret",
                 "http://localhost:1"
         );
 

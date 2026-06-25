@@ -21,7 +21,6 @@ docker compose up -d postgres kafka
 | Payment Service         | http://localhost:8085/swagger-ui.html    | 8085 |
 | Notification Service    | http://localhost:8090/swagger-ui.html    | 8090 |
 | Booklet Service         | http://localhost:8087/swagger-ui.html    | 8087 |
-| Booklet Request Service | http://localhost:8088/swagger-ui.html    | 8088 |
 
 ---
 
@@ -149,8 +148,6 @@ To run a service locally instead of via Docker:
 # Booklet Service
 ./mvnw spring-boot:run -pl booklet-service
 
-# Booklet Request Service
-./mvnw spring-boot:run -pl booklet-request-service
 ```
 
 > Stop the matching Docker container first to avoid port conflicts:

@@ -1,6 +1,5 @@
 package com.holidayplanner.eventservice.scheduler;
 
-import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.eventservice.port.IdentityServicePort;
 import com.holidayplanner.eventservice.query.EventTermQueryService;
@@ -23,23 +22,21 @@ import java.util.UUID;
 public class DayBeforeNotificationsJob {
 
     private final EventTermQueryService eventTermQueryService;
-    private final BookingServicePort bookingServicePort;
     private final IdentityServicePort identityServicePort;
     private final EventTermEventPublisher eventTermEventPublisher;
     private final Clock clock;
-    // Runs at 02:15 AM every day, gets all ACTIVE event terms starting the next day, fetches participant names and caregiver emails and publishes a Kafka event for each caregiver.
+    // Runs at 02:15 AM every day, gets all ACTIVE event terms starting the next day and publishes a Kafka event for each caregiver.
     @Scheduled(cron = "${event-service.scheduler.day-before-cron:0 15 2 * * *}")
     public void scheduleDayBeforeNotifications() {
         LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
         List<EventTerm> terms = eventTermQueryService.findActiveTermsStartingOn(tomorrow);
         for (EventTerm term : terms) {
             try {
-                List<String> participantNames = bookingServicePort.getParticipantDisplayNames(term.getId());
                 String eventName = term.getEvent() != null ? term.getEvent().getShortTitle() : "";
                 String termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : "";
                 for (UUID caregiverId : term.getCaregiverIds()) {
                     identityServicePort.findCaregiverById(caregiverId).ifPresentOrElse(
-                            cg -> publishForCaregiver(term, cg, eventName, termDate, participantNames),
+                            cg -> publishForCaregiver(term, cg, eventName, termDate),
                             () -> log.warn("Caregiver {} not found for event term {}", caregiverId, term.getId()));
                 }
             } catch (Exception e) {
@@ -52,14 +49,12 @@ public class DayBeforeNotificationsJob {
             EventTerm term,
             Caregiver caregiver,
             String eventName,
-            String termDate,
-            List<String> participantNames) {
+            String termDate) {
         ParticipantListRequestedPayload payload = new ParticipantListRequestedPayload(
                 term.getId(),
                 caregiver.getEmail(),
                 eventName,
-                termDate,
-                participantNames);
+                termDate);
         eventTermEventPublisher.publishParticipantListRequested(payload);
     }
 }

@@ -3,7 +3,6 @@ package com.holidayplanner.eventservice.component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.eventservice.client.BookingServiceClient;
 import com.holidayplanner.eventservice.client.IdentityServiceClient;
-import com.holidayplanner.eventservice.client.NotificationServiceClient;
 import com.holidayplanner.eventservice.dto.ChangeStatusRequest;
 import com.holidayplanner.eventservice.dto.CreateEventRequest;
 import com.holidayplanner.eventservice.dto.CreateEventTermRequest;
@@ -67,9 +66,6 @@ class EventControllerComponentTest {
 
     @MockBean
     private IdentityServiceClient identityServiceClient;
-
-    @MockBean
-    private NotificationServiceClient notificationServiceClient;
 
     private static final String BEARER = "Bearer " + TestJwt.token("EVENT_OWNER", "ADMIN");
 

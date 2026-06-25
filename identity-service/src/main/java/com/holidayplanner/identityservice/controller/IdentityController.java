@@ -138,7 +138,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/owner-email")
-    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
             @PathVariable("memberId") UUID memberId) {
         String email = queryService.getUserEmailByFamilyMemberId(memberId);
@@ -146,7 +146,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/display-name")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER', 'SERVICE')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
@@ -184,7 +184,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/caregivers/{caregiverId}")
-    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER','SERVICE')")
     public ResponseEntity<CaregiverResponse> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
         return ResponseEntity.ok(CaregiverResponse.from(queryService.getCaregiverById(caregiverId)));
     }
