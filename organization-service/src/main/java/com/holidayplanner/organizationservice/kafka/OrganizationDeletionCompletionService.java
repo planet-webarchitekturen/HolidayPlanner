@@ -2,6 +2,7 @@ package com.holidayplanner.organizationservice.kafka;
 
 import com.holidayplanner.organizationservice.repository.OrganizationRepository;
 import com.holidayplanner.shared.kafka.payload.OrganizationDeletedPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionRolledBackPayload;
 import com.holidayplanner.shared.model.Organization;
 import com.holidayplanner.shared.model.OrganizationStatus;
 import jakarta.annotation.PreDestroy;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -31,6 +33,9 @@ public class OrganizationDeletionCompletionService {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<UUID, ScheduledFuture<?>> pendingFinalization = new ConcurrentHashMap<>();
 
+    /** Orgs for which at least one PAID payment has been refunded — the saga has passed the pivot point. */
+    private final Set<UUID> pivotCrossed = ConcurrentHashMap.newKeySet();
+
     /** Call when the deletion saga starts, to guarantee eventual completion. */
     public void scheduleFallback(UUID organizationId) {
         reschedule(organizationId, MAX_WAIT_SECONDS);
@@ -39,6 +44,33 @@ public class OrganizationDeletionCompletionService {
     /** Call whenever a BookingCancelled event is observed for this organization. */
     public void onActivitySeen(UUID organizationId) {
         reschedule(organizationId, QUIET_PERIOD_SECONDS);
+    }
+
+    /**
+     * Called by PaymentRefundedConsumer when a PAID payment is refunded for a DELETING org.
+     * After this point the saga has passed the refund pivot and cannot be compensated.
+     */
+    public void markPivotCrossed(UUID organizationId) {
+        pivotCrossed.add(organizationId);
+        log.info("Refund pivot crossed for organization {}", organizationId);
+    }
+
+    /** Returns true if at least one PAID payment has been refunded for this org's deletion saga. */
+    public boolean isPivotCrossed(UUID organizationId) {
+        return pivotCrossed.contains(organizationId);
+    }
+
+    /**
+     * Cancel the pending finalization timer for an org being rolled back.
+     * Must be called before the org status is changed to prevent a late timer
+     * from setting it to DELETED after a successful rollback.
+     */
+    public void cancelPendingFinalization(UUID organizationId) {
+        ScheduledFuture<?> pending = pendingFinalization.remove(organizationId);
+        if (pending != null) {
+            pending.cancel(false);
+        }
+        pivotCrossed.remove(organizationId);
     }
 
     private void reschedule(UUID organizationId, long delaySeconds) {

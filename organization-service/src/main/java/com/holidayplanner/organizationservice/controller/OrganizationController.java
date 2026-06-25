@@ -68,6 +68,18 @@ public class OrganizationController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Rolls back a deletion saga that has not yet crossed the refund pivot.
+     * Only callable while the org is in DELETING state and no PAID payment has been refunded.
+     * Restores the org to ACTIVE and triggers compensation in downstream services via Kafka.
+     */
+    @PostMapping("/{organizationId}/rollback-deletion")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> rollbackDeletion(@PathVariable("organizationId") UUID organizationId) {
+        organizationCommandService.rollbackDeletion(organizationId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{organizationId}")
     @PreAuthorize("hasAnyRole('ORGANIZATION_OWNER', 'ADMIN')")
     public ResponseEntity<Organization> updateOrganization(

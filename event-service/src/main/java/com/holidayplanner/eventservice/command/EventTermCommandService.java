@@ -61,10 +61,14 @@ public class EventTermCommandService {
         EventTermStatus current = term.getStatus();
         EventTermStatusTransitions.requireTransition(current, newStatus);
         term.setStatus(newStatus);
+        if (newStatus == EventTermStatus.CANCELLED && actor == CancellationActor.SYSTEM) {
+            // Stamp the term so it can be identified and restored during saga rollback.
+            term.setCancelledBySaga(true);
+        }
         EventTerm saved = eventTermRepository.save(term);
 
         if (newStatus == EventTermStatus.CANCELLED) {
-            eventTermCancellationSaga.start(term, actor);
+            eventTermCancellationSaga.start(saved, actor);
         }
         return EventTermResponse.from(saved);
     }

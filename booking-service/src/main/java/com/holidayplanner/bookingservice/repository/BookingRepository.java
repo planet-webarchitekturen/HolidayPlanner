@@ -26,4 +26,6 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     @Query("SELECT b FROM Booking b WHERE b.familyMemberId = :familyMemberId AND b.status != 'CANCELLED' ORDER BY b.bookedAt DESC")
     List<Booking> findActiveBookingsByFamilyMember(@Param("familyMemberId") UUID familyMemberId);
+
+    List<Booking> findByEventTermIdAndSagaCancelledTrue(UUID eventTermId);
 }

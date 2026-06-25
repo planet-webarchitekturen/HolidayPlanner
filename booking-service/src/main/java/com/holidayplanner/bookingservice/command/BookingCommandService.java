@@ -9,6 +9,7 @@ import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
@@ -136,6 +137,8 @@ public class BookingCommandService {
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .toList();
         active.forEach(b -> {
+            b.setSagaCancelled(true);
+            b.setSagaCancelledOriginalStatus(b.getStatus());
             b.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(b);
             String parentEmail = null;
@@ -149,6 +152,23 @@ public class BookingCommandService {
                     parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled",
                     resolvedOrganizationId, resolvedEventTermEventId);
             bookingEventProducer.publishBookingCancelled(payload);
+        });
+    }
+
+    public void restoreAllBookingsForTerm(UUID eventTermId, UUID organizationId) {
+        List<Booking> sagaBookings = bookingRepository.findByEventTermIdAndSagaCancelledTrue(eventTermId);
+        sagaBookings.forEach(b -> {
+            BookingStatus originalStatus = b.getSagaCancelledOriginalStatus();
+            if (originalStatus == null) {
+                originalStatus = BookingStatus.CONFIRMED;
+            }
+            b.setStatus(originalStatus);
+            b.setSagaCancelled(false);
+            b.setSagaCancelledOriginalStatus(null);
+            bookingRepository.save(b);
+            bookingEventProducer.publishBookingRestored(
+                    new BookingRestoredPayload(b.getId(), eventTermId, organizationId));
+            log.info("Restored booking {} to {} (org rollback)", b.getId(), originalStatus);
         });
     }
 

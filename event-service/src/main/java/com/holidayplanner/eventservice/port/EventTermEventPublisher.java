@@ -2,6 +2,7 @@ package com.holidayplanner.eventservice.port;
 
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
 import com.holidayplanner.shared.kafka.payload.EventTermCancelledPayload;
+import com.holidayplanner.shared.kafka.payload.EventTermRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.ParticipantListRequestedPayload;
 
 /**
@@ -14,4 +15,6 @@ public interface EventTermEventPublisher {
     void publishParticipantListRequested(ParticipantListRequestedPayload payload);
 
     void publishCapacityIncreased(CapacityIncreasedPayload payload);
+
+    void publishEventTermRestored(EventTermRestoredPayload payload);
 }

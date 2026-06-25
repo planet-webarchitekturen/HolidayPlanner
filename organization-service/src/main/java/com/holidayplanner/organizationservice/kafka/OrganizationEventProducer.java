@@ -3,8 +3,9 @@ package com.holidayplanner.organizationservice.kafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.OrganizationCreatedPayload;
-import com.holidayplanner.shared.kafka.payload.OrganizationDeletionStartedPayload;
 import com.holidayplanner.shared.kafka.payload.OrganizationDeletedPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionRolledBackPayload;
+import com.holidayplanner.shared.kafka.payload.OrganizationDeletionStartedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -59,6 +60,20 @@ public class OrganizationEventProducer {
                     payload.getOrganizationId().toString(), json);
         } catch (Exception e) {
             log.error("Failed to publish OrganizationDeleted event", e);
+        }
+    }
+
+    public void publishOrganizationDeletionRolledBack(OrganizationDeletionRolledBackPayload payload) {
+        try {
+            KafkaEnvelope<OrganizationDeletionRolledBackPayload> envelope = new KafkaEnvelope<>(
+                    "OrganizationDeletionRolledBack", "1",
+                    LocalDateTime.now().toString(),
+                    "organization-service", payload);
+            String json = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send("holiday-planner.organization.deletion-rolled-back",
+                    payload.getOrganizationId().toString(), json);
+        } catch (Exception e) {
+            log.error("Failed to publish OrganizationDeletionRolledBack event", e);
         }
     }
 }
