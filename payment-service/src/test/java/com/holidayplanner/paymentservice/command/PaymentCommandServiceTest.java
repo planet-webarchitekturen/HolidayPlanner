@@ -16,8 +16,10 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -75,5 +77,50 @@ class PaymentCommandServiceTest {
         assertEquals(paymentId, captor.getValue().getPaymentId());
         assertEquals(bookingId, captor.getValue().getBookingId());
         assertEquals(organizationId, captor.getValue().getOrganizationId());
+    }
+
+    // ── restoreVoidedPayment ──────────────────────────────────────────────────
+
+    @Test
+    void restoreVoidedPayment_voidedPayment_isRestoredToPending() {
+        UUID bookingId = UUID.randomUUID();
+        Payment payment = new Payment();
+        payment.setId(UUID.randomUUID());
+        payment.setBookingId(bookingId);
+        payment.setStatus(PaymentStatus.VOIDED);
+
+        when(paymentRepository.findByBookingId(bookingId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentCommandService.restoreVoidedPayment(bookingId);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    void restoreVoidedPayment_nonVoidedPayment_isNotChanged() {
+        UUID bookingId = UUID.randomUUID();
+        Payment payment = new Payment();
+        payment.setId(UUID.randomUUID());
+        payment.setBookingId(bookingId);
+        payment.setStatus(PaymentStatus.REFUNDED);
+
+        when(paymentRepository.findByBookingId(bookingId)).thenReturn(Optional.of(payment));
+
+        paymentCommandService.restoreVoidedPayment(bookingId);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void restoreVoidedPayment_noPaymentFound_doesNothing() {
+        UUID bookingId = UUID.randomUUID();
+        when(paymentRepository.findByBookingId(bookingId)).thenReturn(Optional.empty());
+
+        paymentCommandService.restoreVoidedPayment(bookingId);
+
+        verify(paymentRepository, never()).save(any());
     }
 }

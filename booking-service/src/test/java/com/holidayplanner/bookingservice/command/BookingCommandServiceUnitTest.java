@@ -9,6 +9,7 @@ import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.Test;
@@ -242,5 +243,99 @@ class BookingCommandServiceUnitTest {
 
         verify(bookingRepository, never()).save(any());
         verify(bookingEventProducer, never()).publishWaitlistPromoted(any());
+    }
+
+    // ── cancelAllBookings – saga stamp ────────────────────────────────────────
+
+    @Test
+    void cancelAllBookings_stampsSagaFieldsBeforeCancelling() {
+        Booking confirmed = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CONFIRMED,
+                LocalDateTime.now());
+        Booking waitlisted = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.WAITLISTED,
+                LocalDateTime.now().minusMinutes(5));
+
+        when(bookingRepository.findByEventTermId(EVENT_TERM_ID))
+                .thenReturn(List.of(confirmed, waitlisted));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.cancelAllBookings(EVENT_TERM_ID);
+
+        assertThat(confirmed.isSagaCancelled()).isTrue();
+        assertThat(confirmed.getSagaCancelledOriginalStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(confirmed.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+
+        assertThat(waitlisted.isSagaCancelled()).isTrue();
+        assertThat(waitlisted.getSagaCancelledOriginalStatus()).isEqualTo(BookingStatus.WAITLISTED);
+        assertThat(waitlisted.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelAllBookings_alreadyCancelledBookingsAreSkipped() {
+        Booking alreadyCancelled = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED,
+                LocalDateTime.now());
+
+        when(bookingRepository.findByEventTermId(EVENT_TERM_ID))
+                .thenReturn(List.of(alreadyCancelled));
+
+        bookingCommandService.cancelAllBookings(EVENT_TERM_ID);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCancelled(any());
+    }
+
+    // ── restoreAllBookingsForTerm – saga rollback ─────────────────────────────
+
+    @Test
+    void restoreAllBookingsForTerm_restoresEachBookingToOriginalStatus() {
+        UUID orgId = UUID.randomUUID();
+        Booking b1 = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b1.setSagaCancelled(true);
+        b1.setSagaCancelledOriginalStatus(BookingStatus.CONFIRMED);
+
+        Booking b2 = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b2.setSagaCancelled(true);
+        b2.setSagaCancelledOriginalStatus(BookingStatus.WAITLISTED);
+
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of(b1, b2));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        assertThat(b1.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(b1.isSagaCancelled()).isFalse();
+        assertThat(b1.getSagaCancelledOriginalStatus()).isNull();
+
+        assertThat(b2.getStatus()).isEqualTo(BookingStatus.WAITLISTED);
+        assertThat(b2.isSagaCancelled()).isFalse();
+        assertThat(b2.getSagaCancelledOriginalStatus()).isNull();
+    }
+
+    @Test
+    void restoreAllBookingsForTerm_publishesBookingRestoredPerBooking() {
+        UUID orgId = UUID.randomUUID();
+        Booking b = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b.setSagaCancelled(true);
+        b.setSagaCancelledOriginalStatus(BookingStatus.CONFIRMED);
+
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of(b));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        verify(bookingEventProducer).publishBookingRestored(any(BookingRestoredPayload.class));
+    }
+
+    @Test
+    void restoreAllBookingsForTerm_whenNoSagaBookings_doesNothing() {
+        UUID orgId = UUID.randomUUID();
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of());
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingRestored(any());
     }
 }
