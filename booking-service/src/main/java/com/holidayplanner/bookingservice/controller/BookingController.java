@@ -38,12 +38,23 @@ public class BookingController {
 
     @GetMapping("/event-term/{eventTermId}/emails")
     public ResponseEntity<List<String>> getParticipantParentEmails(@PathVariable("eventTermId") UUID eventTermId) {
-        return ResponseEntity.ok(bookingQueryService.getParticipantParentEmails(eventTermId));
+        try {
+            return ResponseEntity.ok(bookingQueryService.getParticipantParentEmails(eventTermId));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
+        }
+
     }
 
     @GetMapping("/event-term/{eventTermId}/participant-names")
     public ResponseEntity<List<String>> getParticipantDisplayNames(@PathVariable("eventTermId") UUID eventTermId) {
-        return ResponseEntity.ok(bookingQueryService.getParticipantDisplayNames(eventTermId));
+        try
+{
+            return ResponseEntity.ok(bookingQueryService.getParticipantDisplayNames(eventTermId));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
+        }
+
     }
 
     @GetMapping("/event-term/{eventTermId}/summary")
@@ -62,7 +73,7 @@ public class BookingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('USER', 'EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER')")
+    @PreAuthorize("hasAnyRole('USER', 'EVENT_OWNER', 'ORGANIZATION_TEAM_MEMBER', 'ADMIN')")
     public ResponseEntity<BookingResponse> createBooking(
             @RequestParam("familyMemberId") UUID familyMemberId,
             @RequestParam("eventTermId") UUID eventTermId) {

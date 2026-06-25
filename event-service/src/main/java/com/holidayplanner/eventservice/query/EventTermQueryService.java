@@ -33,7 +33,7 @@ public class EventTermQueryService {
     }
 
     public List<EventTerm> findActiveTermsStartingWithin24Hours(LocalDateTime now) {
-        return eventTermRepository.findActiveTermsStartingInWindow(now, now.plusHours(24));
+        return eventTermRepository.findActiveTermsStartingBefore(now.plusHours(24));
     }
 
     public List<EventTerm> findActiveTermsStartingOn(LocalDate day) {

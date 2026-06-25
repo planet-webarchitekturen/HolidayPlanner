@@ -18,9 +18,13 @@ public class IdentityServiceClient implements IdentityServicePort {
 
     private final RestClient restClient;
 
+    private final String serviceSecret;
+
     public IdentityServiceClient(
-            @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl) {
+            @Value("${services.identity-service.url:http://localhost:8083}") String identityServiceUrl,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret) {
         this.restClient = RestClient.builder().baseUrl(identityServiceUrl).build();
+        this.serviceSecret = serviceSecret;
     }
 
     @Override
@@ -28,6 +32,7 @@ public class IdentityServiceClient implements IdentityServicePort {
         try {
             Caregiver caregiver = restClient.get()
                     .uri("/api/identity/caregivers/{id}", caregiverId)
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .body(Caregiver.class);
             return Optional.ofNullable(caregiver);
