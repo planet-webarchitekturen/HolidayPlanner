@@ -11,14 +11,12 @@ Selected REST endpoints (OpenAPI-style) and domain event schemas for the Holiday
 ```yaml
 POST /api/bookings:
   summary: Book an event term for a family member
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/CreateBookingRequest'
-        example:
-          familyMemberId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-          eventTermId: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+  description: >
+    Inputs are sent as query or form parameters (application/x-www-form-urlencoded),
+    NOT a JSON body. Requires a USER, EVENT_OWNER, ORGANIZATION_TEAM_MEMBER or ADMIN token.
+  parameters:
+    - { name: familyMemberId, in: query, required: true, schema: { type: string, format: uuid } }
+    - { name: eventTermId,    in: query, required: true, schema: { type: string, format: uuid } }
   responses:
     '200':
       description: Booking created (CONFIRMED or WAITLISTED)
@@ -111,16 +109,14 @@ GET /api/bookings/event-term/{eventTermId}:
 ```yaml
 POST /api/auth/register:
   summary: Register a new parent account
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/RegisterUserRequest'
-        example:
-          email: "parent@example.com"
-          password: "s3cr3tP@ss"
-          phoneNumber: "+43664123456"
-          organizationId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  description: >
+    Also mapped at POST /api/identity/users/register. Fields are sent as query or form
+    parameters (application/x-www-form-urlencoded), NOT a JSON body.
+  parameters:
+    - { name: email,          in: query, required: true, schema: { type: string } }
+    - { name: password,       in: query, required: true, schema: { type: string } }
+    - { name: phoneNumber,    in: query, required: true, schema: { type: string } }
+    - { name: organizationId, in: query, required: true, schema: { type: string, format: uuid } }
   responses:
     '201':
       description: User registered
@@ -189,11 +185,14 @@ GET /api/identity/family-members/{memberId}/birth-date:
             birthDate: "2018-03-15"
 ```
 
-### POST /api/users/{userId}/family-members — Add family member
+### POST /api/identity/users/{userId}/family-members — Add family member
 
 ```yaml
-POST /api/users/{userId}/family-members:
+POST /api/identity/users/{userId}/family-members:
   summary: Add a family member (child) to a user's profile
+  description: >
+    firstName, lastName, birthDate and zip are sent as query or form parameters
+    (application/x-www-form-urlencoded), NOT a JSON body.
   parameters:
     - name: userId
       in: path
@@ -201,18 +200,12 @@ POST /api/users/{userId}/family-members:
       schema:
         type: string
         format: uuid
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/AddFamilyMemberRequest'
-        example:
-          firstName: "Anna"
-          lastName: "Müller"
-          birthDate: "2018-03-15"
-          zip: "6900"
+    - { name: firstName, in: query, required: true, schema: { type: string } }
+    - { name: lastName,  in: query, required: true, schema: { type: string } }
+    - { name: birthDate, in: query, required: true, schema: { type: string, format: date } }
+    - { name: zip,       in: query, required: true, schema: { type: string } }
   responses:
-    '201':
+    '200':
       description: Family member added
       content:
         application/json:
@@ -314,23 +307,26 @@ PATCH /api/events/terms/{eventTermId}/status:
 
 ```yaml
 POST /api/organizations:
-  summary: Create a new municipality organization
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/CreateOrganizationRequest'
-        example:
-          name: "Gemeinde Bregenz"
-          bankAccount: "AT12 3456 7890 1234 5678"
-          bookingStartTime: "2026-06-01T08:00:00"
+  summary: Create a new municipality organization (ADMIN only)
+  description: >
+    name, bankAccount and bookingStartTime (optional) are sent as query or form parameters
+    (application/x-www-form-urlencoded), NOT a JSON body.
+  parameters:
+    - { name: name,             in: query, required: true,  schema: { type: string } }
+    - { name: bankAccount,      in: query, required: true,  schema: { type: string } }
+    - { name: bookingStartTime, in: query, required: false, schema: { type: string, format: date-time } }
   responses:
-    '201':
-      description: Organization created
+    '200':
+      description: Organization created (returns the Organization; teamMembers and sponsors are empty for a new org)
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/OrganizationResponse'
+          example:
+            id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+            name: "Gemeinde Bregenz"
+            bankAccount: "AT12 3456 7890 1234 5678"
+            bookingStartTime: "2026-06-01T08:00:00"
+            teamMembers: []
+            sponsors: []
     '409':
       description: Organization name already taken
 ```
@@ -340,6 +336,9 @@ POST /api/organizations:
 ```yaml
 POST /api/organizations/{organizationId}/sponsors:
   summary: Add a sponsor to an organization
+  description: >
+    name and amount (optional) are sent as query or form parameters
+    (application/x-www-form-urlencoded), NOT a JSON body.
   parameters:
     - name: organizationId
       in: path
@@ -347,21 +346,17 @@ POST /api/organizations/{organizationId}/sponsors:
       schema:
         type: string
         format: uuid
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/AddSponsorRequest'
-        example:
-          name: "Raiffeisenbank Vorarlberg"
-          amount: 500.00
+    - { name: name,   in: query, required: true,  schema: { type: string } }
+    - { name: amount, in: query, required: false, schema: { type: number } }
   responses:
-    '201':
-      description: Sponsor added
+    '200':
+      description: Sponsor added (returns the Sponsor)
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/SponsorResponse'
+          example:
+            id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+            name: "Raiffeisenbank Vorarlberg"
+            amount: 500.00
 ```
 
 ---
@@ -385,11 +380,21 @@ PATCH /api/payments/{paymentId}/pay:
       example: "Received 2026-07-10, bank reference #12345"
   responses:
     '200':
-      description: Payment marked as PAID
+      description: Payment marked as PAID (returns the updated Payment)
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/PaymentResponse'
+          example:
+            id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            bookingId: "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"
+            organizationId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+            amount: 15.00
+            status: "PAID"
+            createdAt: "2026-07-01T09:00:00"
+            paidAt: "2026-07-10T11:00:00"
+            refundedAt: null
+            note: "Received 2026-07-10, bank reference #12345"
+            parentEmail: "parent@example.com"
+            eventName: "Bicycle Tour"
     '409':
       description: Payment is not in PENDING status (e.g. already PAID or REFUNDED)
 ```
@@ -431,40 +436,35 @@ GET /api/payments/organization/{organizationId}/balance:
         format: uuid
   responses:
     '200':
-      description: Balance returned
+      description: Balance returned as a bare decimal number (not an object)
       content:
         application/json:
-          example:
-            organizationId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-            balance: 2350.00
+          schema: { type: number, format: decimal }
+          example: 2350.00
 ```
 
 ---
 
 ## BookletService (port 8087)
 
-### POST /api/booklets/generate — Generate organization booklet
+### GET /api/booklets/organizations/{organizationId} — Generate organization booklet
 
 ```yaml
-POST /api/booklets/generate:
-  summary: Generate a PDF booklet for an organization (Org Team)
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/GenerateBookletRequest'
-        example:
-          organizationName: "Gemeinde Bregenz"
-          contactInfo: "Rathausplatz 1, 6900 Bregenz | info@bregenz.at"
-          eventSummaries:
-            - "Bicycle Tour — 15. Juli 2026, 9:00–17:00 — Bregenz Harbour"
-            - "Swimming Course — 20. Juli 2026, 10:00–12:00 — Freibad Bregenz"
-          sponsorNames:
-            - "Raiffeisenbank Vorarlberg"
-            - "Hypo Vorarlberg"
+GET /api/booklets/organizations/{organizationId}:
+  summary: Generate a PDF booklet for an organization (ORGANIZATION_OWNER or ADMIN)
+  description: >
+    Takes no request body. The service gathers organization, team, sponsor and event data
+    itself via its upstream service clients, then renders the PDF.
+  parameters:
+    - name: organizationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     '200':
-      description: PDF booklet returned as binary
+      description: PDF booklet returned as binary (Content-Disposition attachment)
       content:
         application/pdf:
           schema:
@@ -476,7 +476,7 @@ POST /api/booklets/generate:
 
 ## Domain Event Schemas
 
-All events are published as JSON messages via an event bus (e.g. Spring ApplicationEvent or a message broker like RabbitMQ/Kafka).
+All events are published as JSON messages to **Apache Kafka**. The examples below show only the `payload`; in transit each payload is wrapped in the standard envelope (`eventType`, `eventId`, `version`, `timestamp`, `source`, `payload`). See [messaging-conventions.md](messaging-conventions.md) for the full envelope format and topic naming.
 
 ### BookingCreated
 
@@ -589,14 +589,16 @@ All events are published as JSON messages via an event bus (e.g. Spring Applicat
 
 ---
 
-## DTO Summary by Service
+## Request & Response Shapes by Service
 
-| Service | Request DTOs | Response DTOs |
+> **Naming/format convention.** Most write endpoints bind their inputs with Spring `@RequestParam`, so they are called with **query or form parameters** (`application/x-www-form-urlencoded`), not a JSON body. Only the endpoints listed below as "JSON body" take a `@RequestBody`. Some `*Request` DTO classes exist in the code but are not wired to a controller; the table below is derived from the actual controllers and is the source of truth.
+
+| Service | Request style | Response shape |
 |---|---|---|
-| booking-service | `CreateBookingRequest` | `BookingResponse` |
-| identity-service | `RegisterUserRequest`, `LoginRequest`, `AddFamilyMemberRequest`, `CreateCaregiverRequest` | `UserResponse`, `FamilyMemberResponse`, `CaregiverResponse` |
-| event-service | `CreateEventRequest`, `UpdateEventRequest`, `CreateEventTermRequest`, `CreateRemarkRequest` | `EventResponse`, `EventTermResponse`, `RemarkResponse` |
-| organization-service | `CreateOrganizationRequest`, `UpdateOrganizationRequest`, `AddTeamMemberRequest`, `AddSponsorRequest` | `OrganizationResponse`, `TeamMemberResponse`, `SponsorResponse` |
-| payment-service | `CreatePaymentRequest`, `MarkAsPaidRequest`, `RefundPaymentRequest` | `PaymentResponse` |
-| notification-service | `SendEmailRequest`, `SendBulkEmailRequest`, `NotifyBookingConfirmedRequest`, `NotifyTermCancelledRequest`, `NotifyCaregiverRequest` | — (all void) |
-| booklet-service | `GenerateBookletRequest`, `GenerateParticipantListRequest` | — (returns `byte[]`) |
+| booking-service | Query/form params (`familyMemberId`, `eventTermId`); path params for reads | `BookingResponse` |
+| identity-service | JSON body for `login` (`LoginRequest`), `refresh` (`RefreshRequest`), update user (`UpdateUserRequest`); **query/form params** for register, add family member, caregivers | `UserResponse`, `FamilyMemberResponse`, `CaregiverResponse`; `login`/`refresh` return `LoginResponse` |
+| event-service | JSON body (`CreateEventRequest`, `UpdateEventRequest`, `CreateEventTermRequest`, `ChangeStatusRequest`, `CreateRemarkRequest`, `SendMessageRequest`, `UpdateCapacityRequest`) | `EventResponse`, `EventTermResponse`, `RemarkResponse` |
+| organization-service | Query/form params for all writes | Reads → `OrganizationResponse`, `TeamMemberResponse`, `SponsorResponse`; create / add-sponsor return the raw `Organization` / `Sponsor` entity |
+| payment-service | Query/form params (`note` is a query param) | Raw `Payment` entity; `…/balance` returns a bare `BigDecimal` |
+| notification-service | Event-driven (Kafka); REST is health-only | — |
+| booklet-service | UUID path variable only (no request body) | `byte[]` (`application/pdf`) |

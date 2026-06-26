@@ -27,17 +27,21 @@ Kafka UI: http://localhost:5001
 
 ## Team Members
 
-| Name | Service Responsibility |
-|---|---|
-| Büsra Aydemir | `IdentityService` |
-| Denise Müller | `IdentityService` |
-| Amir Hodzic | `EventService` |
-| Samir Hodzic | `EventService` |
-| Muhammed Güzel | `BookingService` |
-| Tarik Pasalic | `BookingService` |
-| Jan Burtscher | `OrganizationService` + `PaymentService` |
-| Aleksander Lukic | `OrganizationService` + `PaymentService` |
-| Fabian Türtscher | `NotificationService` + `BookletService` |
+All members worked as **backend developers** (Java 21 / Spring Boot) on a microservice they co-owned: domain modelling, REST API, Kafka events and tests for that service. The "Contribution" column summarises each service's scope.
+
+| Name | Role | Service(s) | Contribution |
+|---|---|---|---|
+| Büsra Aydemir | Backend developer | `IdentityService` | User registration & authentication, JWT issuing, transactional outbox |
+| Denise Müller | Backend developer | `IdentityService` | Family members & caregivers, authorization rules, identity events |
+| Amir Hodzic | Backend developer | `EventService` | Events & event terms, status lifecycle, capacity handling |
+| Samir Hodzic | Backend developer | `EventService` | Remarks, caregiver assignment, event-term cancellation saga |
+| Muhammed Güzel | Backend developer | `BookingService` | Booking creation, waiting list, API composition across services |
+| Tarik Pasalic | Backend developer | `BookingService` | Cancellations, capacity-increase & waitlist promotion |
+| Jan Burtscher | Backend developer | `OrganizationService` + `PaymentService` | Organizations, team members, sponsors |
+| Aleksander Lukic | Backend developer | `OrganizationService` + `PaymentService` | Payments, refunds, balance sheet, delete-organization saga |
+| Fabian Türtscher | Backend developer | `NotificationService` + `BookletService` | Email notifications (event-driven consumers) and PDF booklet generation |
+
+> _Roles above reflect service ownership; team members can refine their individual sub-roles (e.g. lead, testing, DevOps) as needed._
 
 ---
 
@@ -262,3 +266,5 @@ See [docs/messaging-conventions.md](docs/messaging-conventions.md) for the full 
 - [Testing Notes](docs/testing-notes.md)
 - [Event Service design](docs/event-service-design.md)
 - [Identity Service](docs/identity-service.md) — REST API, events, outbox, sagas, authorization
+- [API Examples](docs/api-examples.md) — selected REST endpoints and domain event schemas
+- [Postman Collection](docs/HolidayPlanner.postman_collection.json) — import into Postman; run **Identity → Login** to capture the JWT, then call the other services

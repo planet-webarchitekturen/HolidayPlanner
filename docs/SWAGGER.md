@@ -1,5 +1,7 @@
 # Swagger UI Usage Guide
 
+> Prefer Postman? Import [HolidayPlanner.postman_collection.json](HolidayPlanner.postman_collection.json) — it has ready-to-run requests for every service. Run **Identity → Login** first; a test script stores the JWT for all other requests.
+
 ## Prerequisites
 
 Make sure Docker is running with the infrastructure containers:
