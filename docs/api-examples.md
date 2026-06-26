@@ -33,13 +33,14 @@ POST /api/bookings:
             status: "CONFIRMED"
             bookedAt: "2026-06-01T10:00:00"
     '400':
-      description: Family member does not meet age requirements
+      description: Family member is outside the event's age range (minimalAge/maximalAge)
     '404':
       description: Event term not found
     '409':
-      description: Event term is full — booking placed on waitlist (status WAITLISTED returned)
-    '423':
-      description: Booking window not yet open for this organization
+      description: >
+        Term not active, booking window not yet open (before the organization's bookingStartTime),
+        or a duplicate booking already exists for the same family member + term.
+        (A full term is NOT a 409 — it returns 200 with status WAITLISTED.)
 ```
 
 ### DELETE /api/bookings/{bookingId} — Cancel a booking (by user)
@@ -55,12 +56,27 @@ DELETE /api/bookings/{bookingId}:
         type: string
         format: uuid
   responses:
-    '204':
-      description: Booking cancelled successfully
-    '403':
-      description: Cancellation deadline passed (less than 3 days before event)
+    '200':
+      description: Booking cancelled (returns the updated BookingResponse with status CANCELLED)
+    '409':
+      description: A USER cancelled less than 3 days before the event start (owners/admins bypass)
     '404':
       description: Booking not found
+```
+
+### GET /api/bookings/family-member/{familyMemberId}/has-active — Active-booking check (veto support)
+
+```yaml
+GET /api/bookings/family-member/{familyMemberId}/has-active:
+  summary: True if the member has any CONFIRMED/WAITLISTED booking. Used by identity-service's
+    family-member removal veto (inter-service, X-Service-Secret).
+  responses:
+    '200':
+      description: Boolean (true = has active bookings)
+      content:
+        application/json:
+          schema: { type: boolean }
+          example: true
 ```
 
 ### GET /api/bookings/event-term/{eventTermId} — Get bookings for a term
@@ -131,14 +147,46 @@ POST /api/auth/login:
           password: "s3cr3tP@ss"
   responses:
     '200':
-      description: Authentication successful
+      description: Authentication successful (returns both an access token and a refresh token)
       content:
         application/json:
           example:
             token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            expiresAt: "2026-06-02T10:00:00Z"
+            refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            tokenType: "Bearer"
     '401':
       description: Invalid credentials
+```
+
+### POST /api/auth/refresh — Renew the access token (no credentials needed)
+
+```yaml
+POST /api/auth/refresh:
+  summary: Exchange a valid refresh token for a fresh access token (+ rotated refresh token)
+  requestBody:
+    content:
+      application/json:
+        example:
+          refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  responses:
+    '200':
+      description: New access + refresh token (same LoginResponse shape)
+    '500':
+      description: Invalid or expired refresh token
+```
+
+### GET /api/identity/family-members/{memberId}/birth-date — Birth date (veto/age support)
+
+```yaml
+GET /api/identity/family-members/{memberId}/birth-date:
+  summary: Family member's birth date, used by booking-service age verification
+    (inter-service, X-Service-Secret or ORGANIZATION_TEAM_MEMBER/ADMIN/EVENT_OWNER).
+  responses:
+    '200':
+      content:
+        application/json:
+          example:
+            birthDate: "2018-03-15"
 ```
 
 ### POST /api/users/{userId}/family-members — Add family member
@@ -320,25 +368,21 @@ POST /api/organizations/{organizationId}/sponsors:
 
 ## PaymentService (port 8085)
 
-### PATCH /api/payments/{paymentId}/mark-paid — Mark payment as paid
+### PATCH /api/payments/{paymentId}/pay — Mark payment as paid
 
 ```yaml
-PATCH /api/payments/{paymentId}/mark-paid:
-  summary: Mark a bank-transfer payment as received (Accountant only)
+PATCH /api/payments/{paymentId}/pay:
+  summary: Mark a bank-transfer payment as received (Accountant only, org-scoped)
   parameters:
     - name: paymentId
       in: path
       required: true
-      schema:
-        type: string
-        format: uuid
-  requestBody:
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/MarkAsPaidRequest'
-        example:
-          note: "Received 2026-07-10, bank reference #12345"
+      schema: { type: string, format: uuid }
+    - name: note
+      in: query
+      required: false
+      schema: { type: string }
+      example: "Received 2026-07-10, bank reference #12345"
   responses:
     '200':
       description: Payment marked as PAID
@@ -347,7 +391,30 @@ PATCH /api/payments/{paymentId}/mark-paid:
           schema:
             $ref: '#/components/schemas/PaymentResponse'
     '409':
-      description: Payment is not in PENDING status
+      description: Payment is not in PENDING status (e.g. already PAID or REFUNDED)
+```
+
+### PATCH /api/payments/{paymentId}/refund — Refund a payment
+
+```yaml
+PATCH /api/payments/{paymentId}/refund:
+  summary: Refund a paid payment (Accountant only, org-scoped). Publishes PaymentRefunded.
+  parameters:
+    - name: paymentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    - name: note
+      in: query
+      required: false
+      schema: { type: string }
+  responses:
+    '200':
+      description: >
+        Payment marked REFUNDED. Idempotent — refunding an already-REFUNDED payment is a no-op
+        and does NOT re-publish PaymentRefunded.
+    '409':
+      description: Payment is not in PAID status (cannot refund a PENDING payment)
 ```
 
 ### GET /api/payments/organization/{organizationId}/balance — Get balance
@@ -448,6 +515,8 @@ All events are published as JSON messages via an event bus (e.g. Spring Applicat
   }
 }
 ```
+
+> `cancelledBy` is one of `USER | EVENT_OWNER | SYSTEM` (`SYSTEM` = a term cancellation / automated job; notification-service skips the per-booking email in that case because the term-cancellation flow already notifies).
 
 ### EventTermCancelled
 

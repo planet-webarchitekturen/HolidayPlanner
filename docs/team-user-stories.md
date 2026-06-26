@@ -11,18 +11,31 @@ Status verified against codebase audit + test run (see [Test Run Results](#test-
 ## Story Index
 
 
+> **Status update (2026-06-26):** all 10 stories are now implemented and verified (full unit/component suite green, e2e green, and a live acceptance probe passing every criterion). See [Fixes applied (2026-06-26)](#fixes-applied-2026-06-26) below.
+
 | #   | Story (Event)                                                                | Services Involved                                             | Status        | Priority |
 | --- | ---------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------- | -------- |
-| 1   | Create Booking (`BookingCreated`)                                            | booking, event, identity, organization, payment, notification | Partial       | High     |
-| 2   | Cancel Booking & Waitlist Promotion (`BookingCancelled`, `WaitlistPromoted`) | booking, notification, payment                                | Partial       | High     |
-| 3   | Refund a Payment (`PaymentRefunded`)                                         | payment, notification, booking                                | Partial       | High     |
-| 4   | Event Term Cancellation (`EventTermCancelled`)                               | event, booking, notification, payment                         | Mostly done   | Medium   |
-| 5   | Capacity Increase → Waitlist Promotion (`CapacityIncreased`)                 | event, booking, notification                                  | Producer only | High     |
-| 6   | Day-Before Caregiver Notification (`ParticipantListRequested`)               | event, booking, notification, booklet                         | Partial       | Medium   |
-| 7   | Remove Family Member (Guard Check)                                           | identity, booking                                             | Missing veto  | High     |
-| 8   | Delete Organization (Saga)                                                   | organization, event, booking, payment                         | Sync-only     | Medium   |
-| 9   | Authentication & Inter-Service Security (JWT)                                | identity, all services                                        | Partial       | Medium   |
-| 10  | Real Email Delivery                                                          | notification                                                  | Stubbed       | Medium   |
+| 1   | Create Booking (`BookingCreated`)                                            | booking, event, identity, organization, payment, notification | ✅ Done        | High     |
+| 2   | Cancel Booking & Waitlist Promotion (`BookingCancelled`, `WaitlistPromoted`) | booking, notification, payment                                | ✅ Done        | High     |
+| 3   | Refund a Payment (`PaymentRefunded`)                                         | payment, notification, booking                                | ✅ Done        | High     |
+| 4   | Event Term Cancellation (`EventTermCancelled`)                               | event, booking, notification, payment                         | ✅ Done        | Medium   |
+| 5   | Capacity Increase → Waitlist Promotion (`CapacityIncreased`)                 | event, booking, notification                                  | ✅ Done        | High     |
+| 6   | Day-Before Caregiver Notification (`ParticipantListRequested`)               | event, booking, notification, booklet                         | ✅ Done        | Medium   |
+| 7   | Remove Family Member (Guard Check)                                           | identity, booking                                             | ✅ Done        | High     |
+| 8   | Delete Organization (Saga)                                                   | organization, event, booking, payment                         | ✅ Done        | Medium   |
+| 9   | Authentication & Inter-Service Security (JWT)                                | identity, all services                                        | ✅ Done        | Medium   |
+| 10  | Real Email Delivery                                                          | notification                                                  | ✅ Done        | Medium   |
+
+## Fixes applied (2026-06-26)
+
+Final pass that closed the remaining acceptance criteria (stories 4, 5, 6, 10 were already complete):
+
+- **Story 1 — Create Booking integrity:** added age verification (→ `400` when the child is outside the event's `minimalAge`/`maximalAge`), booking-window check via a new booking-side `OrganizationServiceClient` (→ `409` before `bookingStartTime`), and a duplicate guard (→ `409` for the same family member + term). Event term DTOs now carry `minimalAge`/`maximalAge`; identity exposes a SERVICE-accessible `/birth-date` helper.
+- **Story 2 — Cancel + Waitlist:** a plain `USER` may only cancel up to **3 days** before the term start (→ `409`); owners/admins bypass. The `CancelledBy` enum is aligned to `USER | EVENT_OWNER | SYSTEM` and set from the caller's role.
+- **Story 3 — Refund:** `markAsPaid`/`refundPayment` now validate state transitions (→ `409`: refund only a `PAID` payment, pay only a `PENDING` one); re-refunding a `REFUNDED` payment is an idempotent no-op (no duplicate event).
+- **Story 7 — Remove Family Member veto:** fixed a bean-wiring bug (the identity `BookingServiceClient` was built with null fields → the veto silently NPE'd). It now calls a new `GET /api/bookings/family-member/{id}/has-active` (active = CONFIRMED/WAITLISTED only), maps the veto to `409`, and **fails safe** (rejects) if booking-service is unreachable.
+- **Story 8 — Delete Organization:** deleting an org now cancels each active term through the existing Story-4 `EventTermCancelled` choreography, so bookings are cancelled, payments refunded, and parents/caregivers notified — no orphaned data.
+- **Story 9 — Auth/JWT:** added `POST /api/auth/refresh` and refresh-token issuance at login, so an access token can be renewed without re-entering credentials (ownership checks and `ServiceAuthenticationFilter` were already in place).
 
 
 ---
