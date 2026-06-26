@@ -12,6 +12,7 @@ import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.CancelledBy;
 import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,8 @@ public class BookingCommandService {
         String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
         BookingCreatedPayload payload = new BookingCreatedPayload(
                 saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                status.name(), parentEmail, eventTerm.getEventName(), termDate,
+                status, parentEmail, eventTerm.getEventName(), termDate,
+                eventTerm.getMeetingPoint(), eventTerm.getPaymentMethod(),
                 eventTerm.getOrganizationId(), eventTerm.getPrice());
         bookingEventProducer.publishBookingCreated(payload);
 
@@ -96,7 +98,7 @@ public class BookingCommandService {
         }
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                parentEmail, eventName, termDate, "parent");
+                parentEmail, eventName, termDate, CancelledBy.PARENT);
         bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
@@ -134,7 +136,7 @@ public class BookingCommandService {
             }
             BookingCancelledPayload payload = new BookingCancelledPayload(
                     b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                    parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled");
+                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.TERM_CANCELLED);
             bookingEventProducer.publishBookingCancelled(payload);
         });
     }

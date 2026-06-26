@@ -9,14 +9,18 @@ import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
+import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.PaymentMethod;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +63,10 @@ class BookingCommandServiceUnitTest {
         d.setId(EVENT_TERM_ID);
         d.setStatus("ACTIVE");
         d.setMaxParticipants(maxParticipants);
+        d.setEventName("Bike Adventure");
+        d.setMeetingPoint("Main gate");
+        d.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+        d.setPrice(new BigDecimal("12.50"));
         return d;
     }
 
@@ -86,7 +94,11 @@ class BookingCommandServiceUnitTest {
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         assertThat(result.getFamilyMemberId()).isEqualTo(FAMILY_MEMBER_ID);
         assertThat(result.getEventTermId()).isEqualTo(EVENT_TERM_ID);
-        verify(bookingEventProducer).publishBookingCreated(any());
+        ArgumentCaptor<BookingCreatedPayload> payload = ArgumentCaptor.forClass(BookingCreatedPayload.class);
+        verify(bookingEventProducer).publishBookingCreated(payload.capture());
+        assertThat(payload.getValue().getMeetingPoint()).isEqualTo("Main gate");
+        assertThat(payload.getValue().getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        assertThat(payload.getValue().getAmount()).isEqualByComparingTo("12.50");
     }
 
     @Test

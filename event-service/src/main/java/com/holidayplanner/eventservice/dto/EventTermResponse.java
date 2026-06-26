@@ -2,6 +2,7 @@ package com.holidayplanner.eventservice.dto;
 
 import com.holidayplanner.shared.model.EventTerm;
 import com.holidayplanner.shared.model.EventTermStatus;
+import com.holidayplanner.shared.model.PaymentMethod;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,7 +19,9 @@ public class EventTermResponse {
     private UUID eventId;
     private String eventName;
     private String eventLocation;
+    private String meetingPoint;
     private BigDecimal price;
+    private PaymentMethod paymentMethod;
     private LocalDateTime startDateTime;
     private LocalDateTime endDateTime;
     private int minParticipants;
@@ -32,7 +35,9 @@ public class EventTermResponse {
         r.eventId = term.getEvent().getId();
         r.eventName = term.getEvent().getShortTitle();
         r.eventLocation = term.getEvent().getLocation();
+        r.meetingPoint = term.getEvent().getMeetingPoint();
         r.price = term.getEvent().getPrice();
+        r.paymentMethod = term.getEvent().getPaymentMethod();
         r.startDateTime = term.getStartDateTime();
         r.endDateTime = term.getEndDateTime();
         r.minParticipants = term.getMinParticipants();

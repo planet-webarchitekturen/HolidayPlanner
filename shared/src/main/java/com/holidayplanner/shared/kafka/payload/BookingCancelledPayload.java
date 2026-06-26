@@ -1,5 +1,6 @@
 package com.holidayplanner.shared.kafka.payload;
 
+import com.holidayplanner.shared.model.CancelledBy;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,5 +17,5 @@ public class BookingCancelledPayload {
     private String parentEmail;
     private String eventName;
     private String termDate;
-    private String cancelledBy;
+    private CancelledBy cancelledBy;
 }

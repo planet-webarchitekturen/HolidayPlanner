@@ -34,7 +34,7 @@ public class ParticipantListPdfGeneratedConsumer {
           () ->
               notificationService.notifyCaregiverWithParticipantListPdf(
                   payload.getEventTermId(),
-                  payload.getCaregiverEmail(),
+                  payload.getCaregiverEmails(),
                   payload.getEventName(),
                   payload.getTermDate()));
     } catch (Exception e) {

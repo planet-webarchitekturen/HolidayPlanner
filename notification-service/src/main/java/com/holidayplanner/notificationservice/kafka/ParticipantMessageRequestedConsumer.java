@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.notificationservice.service.NotificationService;
 import com.holidayplanner.notificationservice.service.ProcessedEventService;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
-import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.ParticipantMessageRequestedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -14,32 +14,28 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class BookingCreatedConsumer {
+public class ParticipantMessageRequestedConsumer {
 
   private final NotificationService notificationService;
   private final ProcessedEventService processedEventService;
   private final ObjectMapper objectMapper;
 
-  @KafkaListener(topics = "holiday-planner.booking.created", groupId = "notification-service")
+  @KafkaListener(
+      topics = "holiday-planner.event.participant-message-requested",
+      groupId = "notification-service")
   public void consume(String message) throws Exception {
     try {
-      KafkaEnvelope<BookingCreatedPayload> envelope =
+      KafkaEnvelope<ParticipantMessageRequestedPayload> envelope =
           objectMapper.readValue(
-              message, new TypeReference<KafkaEnvelope<BookingCreatedPayload>>() {});
-      BookingCreatedPayload payload = envelope.getPayload();
+              message, new TypeReference<KafkaEnvelope<ParticipantMessageRequestedPayload>>() {});
+      ParticipantMessageRequestedPayload payload = envelope.getPayload();
       processedEventService.process(
           envelope.getEventId(),
           () ->
-              notificationService.notifyBookingCreated(
-                  payload.getParentEmail(),
-                  payload.getEventName(),
-                  payload.getTermDate(),
-                  payload.getStatus(),
-                  payload.getMeetingPoint(),
-                  payload.getPaymentMethod(),
-                  payload.getAmount()));
+              notificationService.notifyParticipants(
+                  payload.getEventTermId(), payload.getSubject(), payload.getBody()));
     } catch (Exception e) {
-      log.error("Failed to process BookingCreated event: {}", e.getMessage());
+      log.error("Failed to process ParticipantMessageRequested event: {}", e.getMessage());
       throw e;
     }
   }

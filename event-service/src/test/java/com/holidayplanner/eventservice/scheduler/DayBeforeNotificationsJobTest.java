@@ -50,7 +50,7 @@ class DayBeforeNotificationsJobTest {
                 eventTermQueryService, identityServicePort, eventTermEventPublisher, fixedClock);
     }
 
-    private EventTerm termWithCaregiver(UUID termId, UUID caregiverId, LocalDateTime start, String eventTitle) {
+    private EventTerm termWithCaregivers(UUID termId, List<UUID> caregiverIds, LocalDateTime start, String eventTitle) {
         Event event = new Event();
         event.setId(UUID.randomUUID());
         event.setShortTitle(eventTitle);
@@ -58,24 +58,29 @@ class DayBeforeNotificationsJobTest {
         t.setId(termId);
         t.setEvent(event);
         t.setStartDateTime(start);
-        t.getCaregiverIds().add(caregiverId);
+        t.getCaregiverIds().addAll(caregiverIds);
         return t;
     }
 
     @Test
-    void publishesParticipantListPerCaregiverForTomorrowsTerms() {
+    void publishesParticipantListWithCaregiverEmailsForTomorrowsTerms() {
         LocalDate tomorrow = LocalDate.now(fixedClock).plusDays(1);
         UUID termId = UUID.randomUUID();
-        UUID caregiverId = UUID.randomUUID();
+        UUID caregiverId1 = UUID.randomUUID();
+        UUID caregiverId2 = UUID.randomUUID();
         LocalDateTime start = tomorrow.atTime(9, 0);
-        EventTerm term = termWithCaregiver(termId, caregiverId, start, "Bike Adventure");
+        EventTerm term = termWithCaregivers(termId, List.of(caregiverId1, caregiverId2), start, "Bike Adventure");
 
-        Caregiver caregiver = new Caregiver();
-        caregiver.setId(caregiverId);
-        caregiver.setEmail("caregiver@example.test");
+        Caregiver caregiver1 = new Caregiver();
+        caregiver1.setId(caregiverId1);
+        caregiver1.setEmail("caregiver1@example.test");
+        Caregiver caregiver2 = new Caregiver();
+        caregiver2.setId(caregiverId2);
+        caregiver2.setEmail("caregiver2@example.test");
 
         when(eventTermQueryService.findActiveTermsStartingOn(tomorrow)).thenReturn(List.of(term));
-        when(identityServicePort.findCaregiverById(caregiverId)).thenReturn(Optional.of(caregiver));
+        when(identityServicePort.findCaregiverById(caregiverId1)).thenReturn(Optional.of(caregiver1));
+        when(identityServicePort.findCaregiverById(caregiverId2)).thenReturn(Optional.of(caregiver2));
 
         job.scheduleDayBeforeNotifications();
 
@@ -84,7 +89,7 @@ class DayBeforeNotificationsJobTest {
         verify(eventTermEventPublisher).publishParticipantListRequested(captor.capture());
         ParticipantListRequestedPayload payload = captor.getValue();
         assertThat(payload.getEventTermId()).isEqualTo(termId);
-        assertThat(payload.getCaregiverEmail()).isEqualTo("caregiver@example.test");
+        assertThat(payload.getCaregiverEmails()).containsExactly("caregiver1@example.test", "caregiver2@example.test");
         assertThat(payload.getEventName()).isEqualTo("Bike Adventure");
         assertThat(payload.getTermDate()).isEqualTo(start.toString());
     }
@@ -94,7 +99,7 @@ class DayBeforeNotificationsJobTest {
         LocalDate tomorrow = LocalDate.now(fixedClock).plusDays(1);
         UUID termId = UUID.randomUUID();
         UUID caregiverId = UUID.randomUUID();
-        EventTerm term = termWithCaregiver(termId, caregiverId, tomorrow.atTime(9, 0), "Bike Adventure");
+        EventTerm term = termWithCaregivers(termId, List.of(caregiverId), tomorrow.atTime(9, 0), "Bike Adventure");
 
         when(eventTermQueryService.findActiveTermsStartingOn(tomorrow)).thenReturn(List.of(term));
         when(identityServicePort.findCaregiverById(caregiverId)).thenReturn(Optional.empty());

@@ -274,6 +274,7 @@ services:
         condition: service_started
     environment:
       DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: booklet_db
       DB_USER: postgres
       DB_PASSWORD: postgres
