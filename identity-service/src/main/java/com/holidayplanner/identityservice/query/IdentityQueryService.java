@@ -4,6 +4,8 @@ import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.FamilyMember;
 import com.holidayplanner.shared.model.User;
 import com.holidayplanner.identityservice.config.JwtTokenProvider;
+import com.holidayplanner.identityservice.dto.LoginResponse;
+import io.jsonwebtoken.Claims;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
 import com.holidayplanner.identityservice.repository.UserRepository;
@@ -158,5 +160,35 @@ public class IdentityQueryService {
 
         List<String> roles = List.of(user.getRole().toString());
         return jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+    }
+
+    /** Issue a long-lived refresh token for an authenticated user (returned alongside the access token at login). */
+    public String issueRefreshToken(User user) {
+        List<String> roles = List.of(user.getRole().toString());
+        return jwtTokenProvider.generateRefreshToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+    }
+
+    /**
+     * Exchange a valid refresh token for a fresh access token (+ rotated refresh token),
+     * without re-supplying credentials.
+     */
+    public LoginResponse refresh(String refreshToken) {
+        Claims claims;
+        try {
+            claims = jwtTokenProvider.parseClaims(refreshToken);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid or expired refresh token");
+        }
+        if (!"refresh".equals(claims.get("type", String.class))) {
+            throw new RuntimeException("Provided token is not a refresh token");
+        }
+        UUID userId = UUID.fromString(claims.getSubject());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        List<String> roles = List.of(user.getRole().toString());
+        String access = jwtTokenProvider.generateToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+        String newRefresh = jwtTokenProvider.generateRefreshToken(user.getId(), user.getOrganizationId(), roles, user.getEmail());
+        return new LoginResponse(user.getId(), user.getEmail(), user.getPhoneNumber(),
+                user.getOrganizationId(), user.getRole(), access, newRefresh);
     }
 }

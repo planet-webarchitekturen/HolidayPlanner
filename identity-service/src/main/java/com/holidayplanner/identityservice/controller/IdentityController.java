@@ -57,8 +57,15 @@ public class IdentityController {
                 user.getPhoneNumber(),
                 user.getOrganizationId(),
                 user.getRole(),
-                token
+                token,
+                queryService.issueRefreshToken(user)
         ));
+    }
+
+    /** Exchange a valid refresh token for a fresh access token without re-entering credentials. */
+    @PostMapping({"/api/auth/refresh", "/api/identity/auth/refresh"})
+    public ResponseEntity<LoginResponse> refresh(@RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(queryService.refresh(request.getRefreshToken()));
     }
 
     // --- User Endpoints ---
@@ -151,6 +158,14 @@ public class IdentityController {
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
         return ResponseEntity.ok(java.util.Map.of("name", name));
+    }
+
+    @GetMapping("/api/identity/family-members/{memberId}/birth-date")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
+    public ResponseEntity<java.util.Map<String, String>> getFamilyMemberBirthDate(
+            @PathVariable("memberId") UUID memberId) {
+        java.time.LocalDate birthDate = queryService.getFamilyMemberById(memberId).getBirthDate();
+        return ResponseEntity.ok(java.util.Map.of("birthDate", birthDate != null ? birthDate.toString() : ""));
     }
 
     @DeleteMapping("/api/identity/family-members/{memberId}")

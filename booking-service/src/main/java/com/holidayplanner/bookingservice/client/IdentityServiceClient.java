@@ -36,6 +36,20 @@ public class IdentityServiceClient {
         return fetchStringField(familyMemberId, "display-name", "name", "display name");
     }
 
+    /** Family member's birth date for age verification, or null if it could not be resolved. */
+    public java.time.LocalDate getFamilyMemberBirthDate(UUID familyMemberId) {
+        String value = fetchStringField(familyMemberId, "birth-date", "birthDate", "birth date");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return java.time.LocalDate.parse(value);
+        } catch (Exception e) {
+            log.warn("Could not parse birth date '{}' for family member {}", value, familyMemberId);
+            return null;
+        }
+    }
+
     private String fetchStringField(UUID familyMemberId, String endpoint, String field, String label) {
         String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId + "/" + endpoint;
         try {

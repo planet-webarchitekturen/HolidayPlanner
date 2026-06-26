@@ -1,12 +1,9 @@
 package com.holidayplanner.identityservice.client;
 
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import com.holidayplanner.identityservice.exception.BookingServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -14,16 +11,13 @@ import java.util.UUID;
 
 /**
  * HTTP client for calling booking-service from identity-service.
- * Used for composition queries to enrich user profiles with booking information.
- * 
- * Follows the same pattern as booking-service's EventServiceClient.
- * Implements graceful degradation: if booking-service is unavailable, 
- * returns 0 rather than failing the entire request.
+ * Used by the family-member / user deletion veto to check for active bookings.
+ *
+ * <p>Fails <b>safe</b>: if booking-service cannot be reached we cannot prove the member has no
+ * active bookings, so we throw and the caller rejects the deletion (rather than silently allowing it).
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
-@NoArgsConstructor(force = true)
 public class BookingServiceClient {
 
     private final RestClient restClient;
@@ -40,33 +34,22 @@ public class BookingServiceClient {
     }
 
     /**
-     * Get the count of active (CONFIRMED or WAITLISTED, non-CANCELLED) bookings for a family member.
-     * 
-     * @param familyMemberId the family member ID
-     * @return count of active bookings, or 0 if booking-service is unavailable
+     * @return true if the family member has at least one active (CONFIRMED or WAITLISTED) booking.
+     * @throws BookingServiceUnavailableException if booking-service cannot be reached (fail-safe reject).
      */
-    public long getActiveBookingCount(UUID familyMemberId) {
-        String url = bookingServiceUrl + "/api/bookings/family-member/" + familyMemberId;
+    public boolean hasActiveBookings(UUID familyMemberId) {
+        String url = bookingServiceUrl + "/api/bookings/family-member/" + familyMemberId + "/has-active";
         try {
-            var response = restClient.get()
+            Boolean result = restClient.get()
                     .uri(url)
                     .header("X-Service-Secret", serviceSecret)
                     .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        log.warn("Booking service returned 4xx for familyMemberId {}: {}", familyMemberId, res.getStatusCode());
-                    })
-                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        log.warn("Booking service returned 5xx for familyMemberId {}: {}", familyMemberId, res.getStatusCode());
-                    })
-                    .body(Object[].class);
-            
-            return response != null ? response.length : 0L;
-        } catch (ResourceAccessException e) {
-            log.warn("Booking service unavailable when querying bookings for familyMemberId {}", familyMemberId, e);
-            return 0L;
+                    .body(Boolean.class);
+            return Boolean.TRUE.equals(result);
         } catch (RestClientException e) {
-            log.warn("Booking service error for familyMemberId {}: {}", familyMemberId, e.getMessage());
-            return 0L;
+            log.warn("Could not verify active bookings for family member {} — failing safe (reject delete): {}",
+                    familyMemberId, e.getMessage());
+            throw new BookingServiceUnavailableException(familyMemberId, e);
         }
     }
 }

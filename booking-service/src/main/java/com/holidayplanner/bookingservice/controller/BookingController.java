@@ -67,6 +67,12 @@ public class BookingController {
         return ResponseEntity.ok(bookingQueryService.getBookingsForFamilyMember(familyMemberId));
     }
 
+    /** Veto support for identity-service: true if the member has any CONFIRMED/WAITLISTED booking. */
+    @GetMapping("/family-member/{familyMemberId}/has-active")
+    public ResponseEntity<Boolean> hasActiveBookings(@PathVariable("familyMemberId") UUID familyMemberId) {
+        return ResponseEntity.ok(bookingQueryService.hasActiveBookings(familyMemberId));
+    }
+
     @GetMapping("/family-member/{familyMemberId}/details")
     public ResponseEntity<List<BookingDetailResponse>> getBookingsForFamilyMemberEnriched(@PathVariable("familyMemberId") UUID familyMemberId) {
         return ResponseEntity.ok(bookingQueryService.getBookingsForFamilyMemberEnriched(familyMemberId));

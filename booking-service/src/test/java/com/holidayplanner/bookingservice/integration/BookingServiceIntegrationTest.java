@@ -49,6 +49,9 @@ class BookingServiceIntegrationTest {
     private IdentityServiceClient identityServiceClient;
 
     @MockBean
+    private com.holidayplanner.bookingservice.client.OrganizationServiceClient organizationServiceClient;
+
+    @MockBean
     private BookingEventProducer bookingEventProducer;
 
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();

@@ -5,7 +5,11 @@ import com.holidayplanner.eventservice.dto.CreateEventRequest;
 import com.holidayplanner.eventservice.dto.EventResponse;
 import com.holidayplanner.eventservice.dto.UpdateEventRequest;
 import com.holidayplanner.eventservice.repository.EventRepository;
+import com.holidayplanner.eventservice.repository.EventTermRepository;
+import com.holidayplanner.eventservice.saga.EventTermCancellationSaga;
 import com.holidayplanner.shared.model.Event;
+import com.holidayplanner.shared.model.EventTerm;
+import com.holidayplanner.shared.model.EventTermStatus;
 import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,6 +25,8 @@ import java.util.UUID;
 public class EventCommandService {
 
     private final EventRepository eventRepository;
+    private final EventTermRepository eventTermRepository;
+    private final EventTermCancellationSaga eventTermCancellationSaga;
 
     public EventResponse createEvent(CreateEventRequest request) {
         Event event = new Event();
@@ -64,6 +70,16 @@ public class EventCommandService {
 
     public void deleteEventsByOrganization(UUID organizationId) {
         List<Event> events = eventRepository.findByOrganizationId(organizationId);
+        // Cancel each ACTIVE term first so the existing EventTermCancelled choreography cascades:
+        // booking-service cancels its bookings, payment-service refunds them, and parents/caregivers
+        // are notified — leaving no orphaned data once the events are deleted.
+        for (Event event : events) {
+            for (EventTerm term : eventTermRepository.findByEvent_Id(event.getId())) {
+                if (term.getStatus() == EventTermStatus.ACTIVE) {
+                    eventTermCancellationSaga.start(term, CancellationActor.SYSTEM);
+                }
+            }
+        }
         eventRepository.deleteAll(events);
     }
 }

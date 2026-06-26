@@ -190,7 +190,7 @@ class NotificationServiceTest {
     NotificationService notificationService = notificationService(mailSender);
 
     notificationService.notifyBookingCancelled(
-        "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.PARENT);
+        "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.USER);
 
     ArgumentCaptor<SimpleMailMessage> messageCaptor =
         ArgumentCaptor.forClass(SimpleMailMessage.class);
@@ -230,7 +230,7 @@ class NotificationServiceTest {
     NotificationService notificationService = notificationService(mailSender);
 
     notificationService.notifyBookingCancelled(
-        "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.TERM_CANCELLED);
+        "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.SYSTEM);
 
     verify(mailSender, never()).send(any(SimpleMailMessage.class));
   }

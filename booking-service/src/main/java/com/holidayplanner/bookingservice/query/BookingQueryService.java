@@ -48,6 +48,11 @@ public class BookingQueryService {
                 .collect(Collectors.toList());
     }
 
+    /** True if the member has any active (non-CANCELLED) booking — used by the identity removal veto. */
+    public boolean hasActiveBookings(UUID familyMemberId) {
+        return !bookingRepository.findActiveBookingsByFamilyMember(familyMemberId).isEmpty();
+    }
+
     public List<BookingDetailResponse> getBookingsForFamilyMemberEnriched(UUID familyMemberId) {
         List<Booking> bookings = bookingRepository.findByFamilyMemberId(familyMemberId);
         return bookings.stream().map(booking -> {

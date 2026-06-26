@@ -10,6 +10,7 @@ import com.holidayplanner.shared.kafka.payload.UserDeletedPayload;
 import com.holidayplanner.shared.kafka.payload.UserUpdatedPayload;
 import com.holidayplanner.shared.kafka.payload.UserRegisteredPayload;
 import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.exception.FamilyMemberHasActiveBookingsException;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
@@ -162,11 +163,8 @@ public class IdentityCommandService {
 
         // Veto check: ensure no family member has active bookings before cascading the delete
         for (FamilyMember member : familyMemberRepository.findByUser_Id(userId)) {
-            long activeBookingCount = bookingServiceClient.getActiveBookingCount(member.getId());
-            if (activeBookingCount > 0) {
-                throw new RuntimeException("Cannot delete user with family members that have active bookings. " +
-                        "Cancel all bookings first (" + activeBookingCount + " active bookings found for member " +
-                        member.getId() + ")");
+            if (bookingServiceClient.hasActiveBookings(member.getId())) {
+                throw new FamilyMemberHasActiveBookingsException(member.getId());
             }
         }
 
@@ -262,10 +260,8 @@ public class IdentityCommandService {
                 .orElseThrow(() -> new RuntimeException("FamilyMember not found: " + memberId));
         
         // Veto check: ensure no active bookings exist for this family member
-        long activeBookingCount = bookingServiceClient.getActiveBookingCount(memberId);
-        if (activeBookingCount > 0) {
-            throw new RuntimeException("Cannot remove family member with active bookings. " +
-                    "Cancel all bookings first (" + activeBookingCount + " active bookings found)");
+        if (bookingServiceClient.hasActiveBookings(memberId)) {
+            throw new FamilyMemberHasActiveBookingsException(memberId);
         }
         
         String firstName = member.getFirstName();

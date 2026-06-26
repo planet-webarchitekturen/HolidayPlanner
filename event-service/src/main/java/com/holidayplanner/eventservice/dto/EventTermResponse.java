@@ -26,6 +26,8 @@ public class EventTermResponse {
     private LocalDateTime endDateTime;
     private int minParticipants;
     private int maxParticipants;
+    private int minimalAge;
+    private int maximalAge;
     private EventTermStatus status;
     private UUID organizationId;
 
@@ -42,6 +44,8 @@ public class EventTermResponse {
         r.endDateTime = term.getEndDateTime();
         r.minParticipants = term.getMinParticipants();
         r.maxParticipants = term.getMaxParticipants();
+        r.minimalAge = term.getEvent().getMinimalAge();
+        r.maximalAge = term.getEvent().getMaximalAge();
         r.status = term.getStatus();
         r.organizationId = term.getEvent().getOrganizationId();
         return r;

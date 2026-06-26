@@ -2,8 +2,10 @@ package com.holidayplanner.bookingservice.command;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
 import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationDto;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
@@ -19,6 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +35,7 @@ public class BookingCommandService {
     private final BookingRepository bookingRepository;
     private final EventServiceClient eventServiceClient;
     private final IdentityServiceClient identityServiceClient;
+    private final OrganizationServiceClient organizationServiceClient;
     private final BookingEventProducer bookingEventProducer;
 
     public BookingResponse createBooking(UUID familyMemberId, UUID eventTermId) {
@@ -47,6 +53,33 @@ public class BookingCommandService {
                     && !currentOrgId.equals(eventTerm.getOrganizationId())) {
                 throw new AccessDeniedException("Event term belongs to a different organization");
             }
+        }
+
+        // Story 1 — Duplicate guard: the same member must not book the same term twice (409).
+        if (bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusNot(
+                familyMemberId, eventTermId, BookingStatus.CANCELLED)) {
+            throw new IllegalStateException(
+                    "Family member " + familyMemberId + " already has a booking for event term " + eventTermId);
+        }
+
+        // Story 1 — Age guard: child must satisfy the event's age range (400).
+        LocalDate birthDate = identityServiceClient.getFamilyMemberBirthDate(familyMemberId);
+        if (birthDate != null) {
+            int age = Period.between(birthDate, LocalDate.now()).getYears();
+            int min = eventTerm.getMinimalAge();
+            int max = eventTerm.getMaximalAge();
+            if (age < min || (max > 0 && age > max)) {
+                throw new IllegalArgumentException("Family member age " + age
+                        + " is outside the allowed range [" + min + ", " + max + "] for this event");
+            }
+        }
+
+        // Story 1 — Booking-window guard: reject bookings before the organization's bookingStartTime (409).
+        OrganizationDto organization = organizationServiceClient.getOrganization(eventTerm.getOrganizationId());
+        if (organization != null && organization.getBookingStartTime() != null
+                && LocalDateTime.now().isBefore(organization.getBookingStartTime())) {
+            throw new IllegalStateException(
+                    "Booking is not open yet for this organization (opens " + organization.getBookingStartTime() + ")");
         }
 
         long confirmedCount = bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
@@ -82,23 +115,35 @@ public class BookingCommandService {
                                                                              // throws exeption therefore
                                                                              // Optional<Booking> is not needed
 
-        booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
-
         String parentEmail = null;
         String eventName = null;
         String termDate = null;
+        LocalDateTime termStart = null;
         try {
             parentEmail = identityServiceClient.getOwnerEmail(booking.getFamilyMemberId());
             EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
             eventName = term.getEventName();
-            termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            termStart = term.getStartDateTime();
+            termDate = termStart != null ? termStart.toString() : null;
         } catch (Exception e) {
             log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
         }
+
+        // Story 2 — a plain USER may only cancel up to 3 days before the event start; owners/admins bypass.
+        boolean isUser = SecurityUtils.hasRole("USER")
+                && !SecurityUtils.hasRole("EVENT_OWNER") && !SecurityUtils.hasRole("ADMIN");
+        if (isUser && termStart != null && LocalDateTime.now().isAfter(termStart.minusDays(3))) {
+            throw new IllegalStateException(
+                    "A user can only cancel a booking up to 3 days before the event start");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+
+        CancelledBy cancelledBy = isUser ? CancelledBy.USER : CancelledBy.EVENT_OWNER;
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                parentEmail, eventName, termDate, CancelledBy.PARENT);
+                parentEmail, eventName, termDate, cancelledBy);
         bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
@@ -136,7 +181,7 @@ public class BookingCommandService {
             }
             BookingCancelledPayload payload = new BookingCancelledPayload(
                     b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.TERM_CANCELLED);
+                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.SYSTEM);
             bookingEventProducer.publishBookingCancelled(payload);
         });
     }

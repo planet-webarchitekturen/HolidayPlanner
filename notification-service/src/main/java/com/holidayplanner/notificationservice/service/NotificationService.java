@@ -115,7 +115,7 @@ public class NotificationService {
 
   public void notifyBookingCancelled(
       String parentEmail, String eventName, String termDate, CancelledBy cancelledBy) {
-    if (cancelledBy == CancelledBy.TERM_CANCELLED) {
+    if (cancelledBy == CancelledBy.SYSTEM) {
       log.info("Skipping booking cancellation email because event term cancellation handles it");
       return;
     }
@@ -130,7 +130,7 @@ public class NotificationService {
               "Your booking for \"%s\" on %s has been cancelled by the event owner.\n\n"
                   + "Holiday Planner Team",
               eventName, termDate);
-    } else if (cancelledBy == CancelledBy.PARENT) {
+    } else if (cancelledBy == CancelledBy.USER) {
       subject = "Booking Cancelled – " + eventName;
       body =
           String.format(
