@@ -169,7 +169,7 @@ class IdentityCommandServiceTest {
             when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
             FamilyMember member = familyMemberOf(existingUser);
             when(familyMemberRepository.findByUser_Id(userId)).thenReturn(List.of(member));
-            when(bookingServiceClient.getActiveBookingCount(member.getId())).thenReturn(0L);
+            when(bookingServiceClient.hasActiveBookings(member.getId())).thenReturn(false);
 
             service.deleteUser(userId);
 
@@ -221,7 +221,7 @@ class IdentityCommandServiceTest {
             member.setId(memberId);
             member.setUser(existingUser);
             when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
-            when(bookingServiceClient.getActiveBookingCount(memberId)).thenReturn(1L);
+            when(bookingServiceClient.hasActiveBookings(memberId)).thenReturn(true);
 
             assertThatThrownBy(() -> service.removeFamilyMember(memberId))
                     .isInstanceOf(ActiveBookingVetoException.class)
@@ -258,7 +258,7 @@ class IdentityCommandServiceTest {
             member.setLastName("Smith");
             member.setUser(existingUser);
             when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
-            when(bookingServiceClient.getActiveBookingCount(memberId)).thenReturn(0L);
+            when(bookingServiceClient.hasActiveBookings(memberId)).thenReturn(false);
 
             service.removeFamilyMember(memberId);
 

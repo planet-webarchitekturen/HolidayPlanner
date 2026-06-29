@@ -1,9 +1,9 @@
 package com.holidayplanner.identityservice.controller;
 
-import com.holidayplanner.shared.model.User;
 import com.holidayplanner.identityservice.command.IdentityCommandService;
 import com.holidayplanner.identityservice.dto.*;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
+import com.holidayplanner.shared.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +14,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Identity Service Controller.
- * 
- * Routes requests to appropriate services following CQRS pattern:
- * - POST/PATCH/DELETE endpoints → IdentityCommandService (write operations)
- * - GET endpoints → IdentityQueryService (read operations)
- */
 @RestController
 @RequiredArgsConstructor
 public class IdentityController {
@@ -28,13 +21,10 @@ public class IdentityController {
     private final IdentityCommandService commandService;
     private final IdentityQueryService queryService;
 
-    // --- Health Check ---
     @GetMapping("/api/identity/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("IdentityService is running!");
     }
-
-    // --- Authentication Endpoints ---
 
     @PostMapping({"/api/auth/register", "/api/identity/users/register"})
     public ResponseEntity<UserResponse> register(
@@ -53,14 +43,13 @@ public class IdentityController {
             var tokens = queryService.loginUserWithRefresh(loginRequest.getEmail(), loginRequest.getPassword());
             User user = queryService.getUserByEmail(loginRequest.getEmail());
             return ResponseEntity.ok(new LoginResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getPhoneNumber(),
-                user.getOrganizationId(),
-                user.getRole(),
-                tokens.accessToken(),
-                tokens.refreshToken()
-            ));
+                    user.getId(),
+                    user.getEmail(),
+                    user.getPhoneNumber(),
+                    user.getOrganizationId(),
+                    user.getRole(),
+                    tokens.accessToken(),
+                    tokens.refreshToken()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -72,20 +61,17 @@ public class IdentityController {
             var result = queryService.loginWithRefreshToken(request.getRefreshToken());
             User user = queryService.getUserById(result.userId());
             return ResponseEntity.ok(new LoginResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getPhoneNumber(),
-                user.getOrganizationId(),
-                user.getRole(),
-                result.accessToken(),
-                result.refreshToken()
-            ));
+                    user.getId(),
+                    user.getEmail(),
+                    user.getPhoneNumber(),
+                    user.getOrganizationId(),
+                    user.getRole(),
+                    result.accessToken(),
+                    result.refreshToken()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
-
-    // --- User Endpoints ---
 
     @GetMapping("/api/identity/users")
     @PreAuthorize("hasRole('ADMIN')")
@@ -119,8 +105,6 @@ public class IdentityController {
         commandService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
-
-    // --- FamilyMember Endpoints ---
 
     @GetMapping("/api/identity/users/{userId}/family-members")
     @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
@@ -192,9 +176,6 @@ public class IdentityController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- Caregiver Endpoints ---
-
-    //CHECK: Can only Admins and event owners create caregivers? or anyone?
     @PostMapping("/api/identity/caregivers")
     @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
     public ResponseEntity<CaregiverResponse> createCaregiver(

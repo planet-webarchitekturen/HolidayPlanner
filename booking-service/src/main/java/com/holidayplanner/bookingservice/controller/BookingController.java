@@ -44,18 +44,15 @@ public class BookingController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
         }
-
     }
 
     @GetMapping("/event-term/{eventTermId}/participant-names")
     public ResponseEntity<List<String>> getParticipantDisplayNames(@PathVariable("eventTermId") UUID eventTermId) {
-        try
-{
+        try {
             return ResponseEntity.ok(bookingQueryService.getParticipantDisplayNames(eventTermId));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
         }
-
     }
 
     @GetMapping("/event-term/{eventTermId}/summary")

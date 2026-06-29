@@ -59,6 +59,10 @@ public class BookingQueryService {
         return new ActiveBookingCheckResponse(activeBookingCount > 0, activeBookingCount);
     }
 
+    public boolean hasActiveBookings(UUID familyMemberId) {
+        return getActiveBookingCheck(familyMemberId).isHasActiveBookings();
+    }
+
     public List<BookingDetailResponse> getBookingsForFamilyMemberEnriched(UUID familyMemberId) {
         List<Booking> bookings = bookingRepository.findByFamilyMemberId(familyMemberId);
         return bookings.stream().map(booking -> {

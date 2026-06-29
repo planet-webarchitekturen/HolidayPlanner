@@ -13,12 +13,10 @@ import java.util.UUID;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
-    // SpringData JPA generates the implementation based on method names
     List<Booking> findByEventTermId(UUID eventTermId);
 
     List<Booking> findByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);
 
-    // FIFO waitlist order: oldest booking is promoted first.
     List<Booking> findByEventTermIdAndStatusOrderByBookedAtAsc(UUID eventTermId, BookingStatus status);
 
     List<Booking> findByFamilyMemberId(UUID familyMemberId);
@@ -37,6 +35,5 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     List<Booking> findByEventTermIdAndSagaCancelledTrue(UUID eventTermId);
 
-    // Duplicate-booking guard: an existing non-CANCELLED booking for the same member+term.
     boolean existsByFamilyMemberIdAndEventTermIdAndStatusNot(UUID familyMemberId, UUID eventTermId, BookingStatus status);
 }

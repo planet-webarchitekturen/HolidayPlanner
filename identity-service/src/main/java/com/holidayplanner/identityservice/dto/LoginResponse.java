@@ -22,7 +22,8 @@ public class LoginResponse {
     private String refreshToken;
     private String tokenType = "Bearer";
 
-    public LoginResponse(UUID id, String email, String phoneNumber, UUID organizationId, UserRole role, String token, String refreshToken) {
+    public LoginResponse(UUID id, String email, String phoneNumber, UUID organizationId, UserRole role,
+                         String token, String refreshToken) {
         this.id = id;
         this.email = email;
         this.phoneNumber = phoneNumber;
