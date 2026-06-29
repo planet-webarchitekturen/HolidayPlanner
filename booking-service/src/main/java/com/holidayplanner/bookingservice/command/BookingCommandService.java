@@ -16,6 +16,7 @@ import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.CancelledBy;
 import com.holidayplanner.shared.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,8 +53,6 @@ public class BookingCommandService {
             throw new IllegalStateException("Event term is not active: " + eventTermId);
         }
 
-        // Cross-org check: only non-USER roles are org-scoped (parents/guardians can
-        // book any org's events)
         if (!SecurityUtils.hasRole("USER") && !SecurityUtils.hasRole("SERVICE")) {
             UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
             if (currentOrgId != null && eventTerm.getOrganizationId() != null
@@ -89,7 +88,8 @@ public class BookingCommandService {
         String parentEmail = identityServiceClient.getOwnerEmail(familyMemberId);
         BookingCreatedPayload payload = new BookingCreatedPayload(
                 saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                status.name(), parentEmail, eventTerm.getEventName(), termDate,
+                status, parentEmail, eventTerm.getEventName(), termDate,
+                eventTerm.getMeetingPoint(), eventTerm.getPaymentMethod(),
                 eventTerm.getOrganizationId(), eventTerm.getPrice());
         bookingEventProducer.publishBookingCreated(payload);
 
@@ -130,36 +130,43 @@ public class BookingCommandService {
     }
 
     public BookingResponse cancelBooking(UUID bookingId) {
-
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId)); // orElse Throw catches empty returns and
-                                                                             // throws exeption therefore
-                                                                             // Optional<Booking> is not needed
-
-        booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
         String parentEmail = null;
         String eventName = null;
         String termDate = null;
+        LocalDateTime termStart = null;
         UUID eventTermOrganizationId = null;
         UUID eventTermEventId = null;
         try {
             parentEmail = identityServiceClient.getOwnerEmail(booking.getFamilyMemberId());
             EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
             eventName = term.getEventName();
-            termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            termStart = term.getStartDateTime();
+            termDate = termStart != null ? termStart.toString() : null;
             eventTermOrganizationId = term.getOrganizationId();
             eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
         }
+
+        boolean isUser = SecurityUtils.hasRole("USER")
+                && !SecurityUtils.hasRole("EVENT_OWNER") && !SecurityUtils.hasRole("ADMIN");
+        if (isUser && termStart != null && LocalDateTime.now().isAfter(termStart.minusDays(3))) {
+            throw new IllegalStateException(
+                    "A user can only cancel a booking up to 3 days before the event start");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+
+        CancelledBy cancelledBy = isUser ? CancelledBy.USER : CancelledBy.EVENT_OWNER;
         BookingCancelledPayload payload = new BookingCancelledPayload(
-            booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-            parentEmail, eventName, termDate, "parent",
-            eventTermOrganizationId, eventTermEventId);
-        
-            bookingEventProducer.publishBookingCancelled(payload);
+                booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
+                parentEmail, eventName, termDate, cancelledBy,
+                eventTermOrganizationId, eventTermEventId);
+        bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
         if (eventTermId != null) {
@@ -202,9 +209,9 @@ public class BookingCommandService {
             } catch (Exception e) {
                 log.warn("Could not fetch parentEmail for cancelAllBookings booking {}: {}", b.getId(), e.getMessage());
             }
-                BookingCancelledPayload payload = new BookingCancelledPayload(
+            BookingCancelledPayload payload = new BookingCancelledPayload(
                     b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                    parentEmail, resolvedEventName, resolvedTermDate, "term-cancelled",
+                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.SYSTEM,
                     resolvedOrganizationId, resolvedEventTermEventId);
             bookingEventProducer.publishBookingCancelled(payload);
         });

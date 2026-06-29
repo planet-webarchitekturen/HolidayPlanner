@@ -3,6 +3,7 @@ package com.holidayplanner.bookingservice.outbox;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,10 +32,12 @@ class OutboxServiceTest {
                 bookingId,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "CONFIRMED",
+                BookingStatus.CONFIRMED,
                 "parent@example.test",
                 "Summer Camp",
                 "2026-07-01T09:00:00",
+                null,
+                null,
                 UUID.randomUUID(),
                 BigDecimal.TEN);
 

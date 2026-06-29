@@ -3,6 +3,7 @@ package com.holidayplanner.bookletservice.kafka;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.bookletservice.service.BookletService;
+import com.holidayplanner.bookletservice.service.ProcessedEventService;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.ParticipantListRequestedPayload;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class ParticipantListRequestedConsumer {
 
   private final BookletService bookletService;
+  private final ProcessedEventService processedEventService;
   private final ObjectMapper objectMapper;
 
   @KafkaListener(
@@ -26,7 +28,15 @@ public class ParticipantListRequestedConsumer {
       KafkaEnvelope<ParticipantListRequestedPayload> envelope =
           objectMapper.readValue(
               message, new TypeReference<KafkaEnvelope<ParticipantListRequestedPayload>>() {});
-      bookletService.createParticipantListPdf(envelope.getPayload());
+      ParticipantListRequestedPayload payload = envelope.getPayload();
+      processedEventService.process(
+          envelope.getEventId(),
+          () ->
+              bookletService.createParticipantListPdf(
+                  payload.getEventTermId(),
+                  payload.getCaregiverEmails(),
+                  payload.getEventName(),
+                  payload.getTermDate()));
     } catch (Exception e) {
       log.error("Failed to process ParticipantListRequested event: {}", e.getMessage());
       throw e;

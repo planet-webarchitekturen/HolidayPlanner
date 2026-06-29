@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -22,16 +21,6 @@ public class LoginResponse {
     private String token;
     private String refreshToken;
     private String tokenType = "Bearer";
-
-    public LoginResponse(UUID id, String email, String phoneNumber, UUID organizationId, UserRole role, String token) {
-        this.id = id;
-        this.email = email;
-        this.phoneNumber = phoneNumber;
-        this.organizationId = organizationId;
-        this.role = role;
-        this.token = token;
-        this.tokenType = "Bearer";
-    }
 
     public LoginResponse(UUID id, String email, String phoneNumber, UUID organizationId, UserRole role, String token, String refreshToken) {
         this.id = id;

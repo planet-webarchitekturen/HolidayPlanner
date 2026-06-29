@@ -15,7 +15,6 @@ import com.holidayplanner.bookletservice.client.SponsorDto;
 import com.holidayplanner.bookletservice.client.TeamMemberDto;
 import com.holidayplanner.bookletservice.kafka.BookletEventProducer;
 import com.holidayplanner.shared.kafka.payload.ParticipantListPdfGeneratedPayload;
-import com.holidayplanner.shared.kafka.payload.ParticipantListRequestedPayload;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -130,8 +129,7 @@ class BookletServiceTest {
         .thenReturn(List.of("Anna", "Ben"));
 
     bookletService.createParticipantListPdf(
-        new ParticipantListRequestedPayload(
-            eventTermId, "caregiver@example.test", "Bike Adventure", "2026-06-15T09:00"));
+        eventTermId, List.of("caregiver@example.test"), "Bike Adventure", "2026-06-15T09:00");
 
     byte[] pdf = bookletService.readParticipantListPdf(eventTermId);
     assertThat(pdf).startsWith("%PDF".getBytes());
@@ -139,7 +137,7 @@ class BookletServiceTest {
         ArgumentCaptor.forClass(ParticipantListPdfGeneratedPayload.class);
     verify(bookletEventProducer).publishParticipantListPdfGenerated(captor.capture());
     assertThat(captor.getValue().getEventTermId()).isEqualTo(eventTermId);
-    assertThat(captor.getValue().getCaregiverEmail()).isEqualTo("caregiver@example.test");
+    assertThat(captor.getValue().getCaregiverEmails()).containsExactly("caregiver@example.test");
   }
 
   private String pdfText(byte[] pdf) throws Exception {

@@ -66,7 +66,7 @@ public class IdentityController {
         }
     }
 
-    @PostMapping("/api/auth/refresh")
+    @PostMapping({"/api/auth/refresh", "/api/identity/auth/refresh"})
     public ResponseEntity<LoginResponse> refresh(@RequestBody RefreshRequest request) {
         try {
             var result = queryService.loginWithRefreshToken(request.getRefreshToken());
@@ -175,6 +175,14 @@ public class IdentityController {
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
         return ResponseEntity.ok(java.util.Map.of("name", name));
+    }
+
+    @GetMapping("/api/identity/family-members/{memberId}/birth-date")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
+    public ResponseEntity<java.util.Map<String, String>> getFamilyMemberBirthDate(
+            @PathVariable("memberId") UUID memberId) {
+        java.time.LocalDate birthDate = queryService.getFamilyMemberById(memberId).getBirthDate();
+        return ResponseEntity.ok(java.util.Map.of("birthDate", birthDate != null ? birthDate.toString() : ""));
     }
 
     @DeleteMapping("/api/identity/family-members/{memberId}")

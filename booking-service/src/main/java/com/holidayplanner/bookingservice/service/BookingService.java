@@ -9,6 +9,7 @@ import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.CancelledBy;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -50,7 +51,7 @@ public class BookingService {
         if (status == BookingStatus.CONFIRMED) {
             BookingCreatedPayload payload = new BookingCreatedPayload(
                     saved.getId(), saved.getFamilyMemberId(), saved.getEventTermId(),
-                    status.name(), null, null, null, null, null);
+                    status, null, null, null, null, null, null, null);
             bookingEventProducer.publishBookingCreated(payload);
         }
 
@@ -66,7 +67,7 @@ public class BookingService {
 
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                null, null, null, "parent",
+                null, null, null, CancelledBy.USER,
                 null, null);
         bookingEventProducer.publishBookingCancelled(payload);
 

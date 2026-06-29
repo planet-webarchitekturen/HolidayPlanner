@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -110,15 +109,10 @@ public class EventTermCommandService {
         if (term.getStatus() != EventTermStatus.ACTIVE) {
             throw new EventTermNotActiveException(eventTermId);
         }
-        List<String> emails = bookingServicePort.getParticipantParentEmails(eventTermId);
-        if (emails.isEmpty()) {
-            log.warn("No participant parent emails returned for event term {} — bulk email skipped", eventTermId);
-            return;
-        }
         String resolvedSubject = subject != null && !subject.isBlank()
                 ? subject
                 : "Message regarding: " + (term.getEvent() != null ? term.getEvent().getShortTitle() : "your event");
         eventTermEventPublisher.publishParticipantMessageRequested(
-                new ParticipantMessageRequestedPayload(eventTermId, emails, resolvedSubject, messageBody));
+                new ParticipantMessageRequestedPayload(eventTermId, resolvedSubject, messageBody));
     }
 }

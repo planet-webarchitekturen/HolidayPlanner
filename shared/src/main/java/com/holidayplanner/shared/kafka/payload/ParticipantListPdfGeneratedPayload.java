@@ -1,5 +1,6 @@
 package com.holidayplanner.shared.kafka.payload;
 
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ParticipantListPdfGeneratedPayload {
   private UUID eventTermId;
-  private String caregiverEmail;
+  private List<String> caregiverEmails;
   private String eventName;
   private String termDate;
 }

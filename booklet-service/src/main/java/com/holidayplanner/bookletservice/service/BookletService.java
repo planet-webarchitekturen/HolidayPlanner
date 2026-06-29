@@ -10,7 +10,6 @@ import com.holidayplanner.bookletservice.client.SponsorDto;
 import com.holidayplanner.bookletservice.client.TeamMemberDto;
 import com.holidayplanner.bookletservice.kafka.BookletEventProducer;
 import com.holidayplanner.shared.kafka.payload.ParticipantListPdfGeneratedPayload;
-import com.holidayplanner.shared.kafka.payload.ParticipantListRequestedPayload;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -188,14 +187,15 @@ public class BookletService {
     return renderPdf(lines);
   }
 
-  public void createParticipantListPdf(ParticipantListRequestedPayload payload) throws IOException {
-    List<String> participantNames =
-        bookingServiceClient.getParticipantDisplayNames(payload.getEventTermId());
+  public void createParticipantListPdf(
+      UUID eventTermId, List<String> caregiverEmails, String eventName, String termDate)
+      throws IOException {
+    List<String> participantNames = bookingServiceClient.getParticipantDisplayNames(eventTermId);
     List<String> lines = new ArrayList<>();
     lines.add("Participant List");
     lines.add("");
-    lines.add("Event: " + or(payload.getEventName(), "-"));
-    lines.add("Date:  " + or(payload.getTermDate(), "-"));
+    lines.add("Event: " + or(eventName, "-"));
+    lines.add("Date:  " + or(termDate, "-"));
     lines.add("Total: " + participantNames.size());
     lines.add("");
     int i = 1;
@@ -204,13 +204,9 @@ public class BookletService {
     }
 
     Files.createDirectories(storageDir);
-    Files.write(participantListPath(payload.getEventTermId()), renderPdf(lines));
+    Files.write(participantListPath(eventTermId), renderPdf(lines));
     bookletEventProducer.publishParticipantListPdfGenerated(
-        new ParticipantListPdfGeneratedPayload(
-            payload.getEventTermId(),
-            payload.getCaregiverEmail(),
-            payload.getEventName(),
-            payload.getTermDate()));
+        new ParticipantListPdfGeneratedPayload(eventTermId, caregiverEmails, eventName, termDate));
   }
 
   public byte[] readParticipantListPdf(UUID eventTermId) throws IOException {

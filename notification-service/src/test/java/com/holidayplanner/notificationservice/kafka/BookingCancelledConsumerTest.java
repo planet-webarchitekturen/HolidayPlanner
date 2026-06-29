@@ -5,6 +5,7 @@ import com.holidayplanner.notificationservice.service.NotificationService;
 import com.holidayplanner.notificationservice.service.ProcessedEventService;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
+import com.holidayplanner.shared.model.CancelledBy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,33 +43,33 @@ class BookingCancelledConsumerTest {
     void parentCancellationDelegatesToNotificationService() throws Exception {
         BookingCancelledConsumer consumer = new BookingCancelledConsumer(notificationService, processedEventService, objectMapper);
 
-        consumer.consume(bookingCancelledMessage("parent"));
+        consumer.consume(bookingCancelledMessage(CancelledBy.USER));
 
         verify(notificationService).notifyBookingCancelled(
-                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", "parent");
+                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.USER);
     }
 
     @Test
     void eventOwnerCancellationDelegatesToNotificationService() throws Exception {
         BookingCancelledConsumer consumer = new BookingCancelledConsumer(notificationService, processedEventService, objectMapper);
 
-        consumer.consume(bookingCancelledMessage("EVENT_OWNER"));
+        consumer.consume(bookingCancelledMessage(CancelledBy.EVENT_OWNER));
 
         verify(notificationService).notifyBookingCancelled(
-                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", "EVENT_OWNER");
+                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.EVENT_OWNER);
     }
 
     @Test
     void termCancellationDelegatesToNotificationService() throws Exception {
         BookingCancelledConsumer consumer = new BookingCancelledConsumer(notificationService, processedEventService, objectMapper);
 
-        consumer.consume(bookingCancelledMessage("term-cancelled"));
+        consumer.consume(bookingCancelledMessage(CancelledBy.SYSTEM));
 
         verify(notificationService).notifyBookingCancelled(
-                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", "term-cancelled");
+                "parent@example.test", "Bike Adventure", "2026-06-15T09:00", CancelledBy.SYSTEM);
     }
 
-    private String bookingCancelledMessage(String cancelledBy) throws Exception {
+    private String bookingCancelledMessage(CancelledBy cancelledBy) throws Exception {
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -77,8 +78,8 @@ class BookingCancelledConsumerTest {
                 "Bike Adventure",
                 "2026-06-15T09:00",
                 cancelledBy,
-                UUID.randomUUID(),   // organizationId
-                UUID.randomUUID());  // eventId
+                UUID.randomUUID(),
+                UUID.randomUUID());
         KafkaEnvelope<BookingCancelledPayload> envelope = new KafkaEnvelope<>(
                 "BookingCancelled", "1", LocalDateTime.now().toString(), "booking-service", payload);
         return objectMapper.writeValueAsString(envelope);

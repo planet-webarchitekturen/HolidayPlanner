@@ -6,6 +6,7 @@ import com.holidayplanner.paymentservice.repository.PaymentRepository;
 import com.holidayplanner.paymentservice.command.PaymentCommandService;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.model.BookingStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -28,7 +29,7 @@ public class BookingCreatedConsumer {
                     new TypeReference<KafkaEnvelope<BookingCreatedPayload>>() {});
             BookingCreatedPayload payload = envelope.getPayload();
 
-            if (!"CONFIRMED".equals(payload.getStatus())) {
+            if (payload.getStatus() != BookingStatus.CONFIRMED) {
                 return;
             }
 

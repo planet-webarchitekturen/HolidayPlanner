@@ -184,7 +184,7 @@ class IdentityCommandServiceTest {
             when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
             FamilyMember member = familyMemberOf(existingUser);
             when(familyMemberRepository.findByUser_Id(userId)).thenReturn(List.of(member));
-            when(bookingServiceClient.getActiveBookingCount(member.getId())).thenReturn(3L);
+            when(bookingServiceClient.getActiveBookingCount(member.getId())).thenReturn(1L);
 
             assertThatThrownBy(() -> service.deleteUser(userId))
                     .hasMessageContaining("active bookings");

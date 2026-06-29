@@ -48,6 +48,11 @@ public class PaymentCommandService {
             throw new AccessDeniedException("Payment belongs to a different organization");
         }
 
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Only a PENDING payment can be marked as PAID; payment " + paymentId + " is " + payment.getStatus());
+        }
+
         payment.setStatus(PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
         payment.setNote(note);
@@ -77,6 +82,15 @@ public class PaymentCommandService {
         if (currentOrgId != null && payment.getOrganizationId() != null
                 && !currentOrgId.equals(payment.getOrganizationId())) {
             throw new AccessDeniedException("Payment belongs to a different organization");
+        }
+
+        // Idempotent: re-refunding an already-REFUNDED payment is a no-op (no duplicate event).
+        if (payment.getStatus() == PaymentStatus.REFUNDED) {
+            return payment;
+        }
+        if (payment.getStatus() != PaymentStatus.PAID) {
+            throw new IllegalStateException(
+                    "Only a PAID payment can be refunded; payment " + paymentId + " is " + payment.getStatus());
         }
 
         payment.setStatus(PaymentStatus.REFUNDED);

@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:paymenttest;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  kafka:
+    bootstrap-servers: localhost:9092
+  task:
+    scheduling:
+      enabled: false
+
+jwt:
+  secret: holidayplanner-super-secret-key-that-is-at-least-256-bits-long
+
+service:
+  secret: holidayplanner-internal-service-secret
+
+services:
+  booking-service:
+    url: http://localhost:8082
+  event-service:
+    url: http://localhost:8081

@@ -1,0 +1,376 @@
+{
+  "info": {
+    "name": "Holiday Planner",
+    "_postman_id": "b2f5b8a4-7c1e-4a2d-9e3f-holidayplanner01",
+    "description": "Real-world REST examples for the Holiday Planner microservices.\n\n## Setup\n1. Start the stack: `docker compose up -d`.\n2. The per-service base URLs are collection variables (`identityUrl`, `eventUrl`, `bookingUrl`, `orgUrl`, `paymentUrl`, `bookletUrl`) — defaults point at localhost.\n3. Run **Identity → Login**: a test script stores the returned access token in the `jwt` collection variable, which every other request sends as `Authorization: Bearer {{jwt}}`.\n4. Fill the id variables (`organizationId`, `eventId`, `eventTermId`, `familyMemberId`, `bookingId`, `paymentId`, `userId`) from earlier responses as you go.\n\n## Note on request formats\nSome endpoints take form parameters (`x-www-form-urlencoded`) and others take a JSON body — this collection matches the actual controllers. See `docs/api-examples.md` for field reference.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{jwt}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "identityUrl", "value": "http://localhost:8083" },
+    { "key": "eventUrl", "value": "http://localhost:8081" },
+    { "key": "bookingUrl", "value": "http://localhost:8082" },
+    { "key": "orgUrl", "value": "http://localhost:8084" },
+    { "key": "paymentUrl", "value": "http://localhost:8085" },
+    { "key": "bookletUrl", "value": "http://localhost:8087" },
+    { "key": "jwt", "value": "" },
+    { "key": "organizationId", "value": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" },
+    { "key": "userId", "value": "" },
+    { "key": "familyMemberId", "value": "" },
+    { "key": "eventId", "value": "" },
+    { "key": "eventTermId", "value": "" },
+    { "key": "bookingId", "value": "" },
+    { "key": "paymentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Identity",
+      "item": [
+        {
+          "name": "Register user",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "email", "value": "parent@example.com" },
+                { "key": "password", "value": "s3cr3tP@ss" },
+                { "key": "phoneNumber", "value": "+43664123456" },
+                { "key": "organizationId", "value": "{{organizationId}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{identityUrl}}/api/auth/register",
+              "host": ["{{identityUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new parent account. Form parameters (x-www-form-urlencoded). Returns 201 with the created user."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('jwt', json.token);",
+                  "  if (json.userId) pm.collectionVariables.set('userId', json.userId);",
+                  "  console.log('Stored JWT for subsequent requests.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"parent@example.com\",\n  \"password\": \"s3cr3tP@ss\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{identityUrl}}/api/auth/login",
+              "host": ["{{identityUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticate and receive an access + refresh token. JSON body. The test script saves `token` into the `jwt` collection variable."
+          }
+        },
+        {
+          "name": "Add family member",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "firstName", "value": "Anna" },
+                { "key": "lastName", "value": "Müller" },
+                { "key": "birthDate", "value": "2018-03-15" },
+                { "key": "zip", "value": "6900" }
+              ]
+            },
+            "url": {
+              "raw": "{{identityUrl}}/api/identity/users/{{userId}}/family-members",
+              "host": ["{{identityUrl}}"],
+              "path": ["api", "identity", "users", "{{userId}}", "family-members"]
+            },
+            "description": "Add a child to the logged-in user's profile (form parameters)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "item": [
+        {
+          "name": "Create organization (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "name", "value": "Gemeinde Bregenz" },
+                { "key": "bankAccount", "value": "AT12 3456 7890 1234 5678" },
+                { "key": "bookingStartTime", "value": "2026-06-01T08:00:00" }
+              ]
+            },
+            "url": {
+              "raw": "{{orgUrl}}/api/organizations",
+              "host": ["{{orgUrl}}"],
+              "path": ["api", "organizations"]
+            },
+            "description": "Create a municipality organization. Requires an ADMIN JWT. Form parameters."
+          }
+        },
+        {
+          "name": "Get organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{orgUrl}}/api/organizations/{{organizationId}}",
+              "host": ["{{orgUrl}}"],
+              "path": ["api", "organizations", "{{organizationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Add sponsor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "name", "value": "Raiffeisenbank Vorarlberg" },
+                { "key": "amount", "value": "500.00" }
+              ]
+            },
+            "url": {
+              "raw": "{{orgUrl}}/api/organizations/{{organizationId}}/sponsors",
+              "host": ["{{orgUrl}}"],
+              "path": ["api", "organizations", "{{organizationId}}", "sponsors"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Event",
+      "item": [
+        {
+          "name": "List events for organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventUrl}}/api/events?organizationId={{organizationId}}",
+              "host": ["{{eventUrl}}"],
+              "path": ["api", "events"],
+              "query": [{ "key": "organizationId", "value": "{{organizationId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Create event (EVENT_OWNER)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"eventOwnerId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n  \"shortTitle\": \"Bicycle Tour\",\n  \"description\": \"A guided bike tour around the lake.\",\n  \"location\": \"Bregenz Harbour\",\n  \"meetingPoint\": \"Main gate\",\n  \"price\": 15.00,\n  \"paymentMethod\": \"BANK_TRANSFER\",\n  \"minimalAge\": 6,\n  \"maximalAge\": 14\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{eventUrl}}/api/events",
+              "host": ["{{eventUrl}}"],
+              "path": ["api", "events"]
+            },
+            "description": "Create an event. JSON body. Requires an EVENT_OWNER (or ADMIN) JWT."
+          }
+        },
+        {
+          "name": "Create event term",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDateTime\": \"2026-07-15T09:00:00\",\n  \"endDateTime\": \"2026-07-15T17:00:00\",\n  \"minParticipants\": 5,\n  \"maxParticipants\": 20\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{eventUrl}}/api/events/{{eventId}}/terms",
+              "host": ["{{eventUrl}}"],
+              "path": ["api", "events", "{{eventId}}", "terms"]
+            }
+          }
+        },
+        {
+          "name": "Change event term status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newStatus\": \"ACTIVE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{eventUrl}}/api/events/terms/{{eventTermId}}/status",
+              "host": ["{{eventUrl}}"],
+              "path": ["api", "events", "terms", "{{eventTermId}}", "status"]
+            },
+            "description": "Activate a term (DRAFT → ACTIVE) so it can be booked, or cancel it (ACTIVE → CANCELLED) to trigger the cancellation saga."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Booking",
+      "item": [
+        {
+          "name": "Create booking",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "familyMemberId", "value": "{{familyMemberId}}" },
+                { "key": "eventTermId", "value": "{{eventTermId}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{bookingUrl}}/api/bookings",
+              "host": ["{{bookingUrl}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Book an event term for a family member (form parameters). Returns CONFIRMED, or WAITLISTED when the term is full."
+          }
+        },
+        {
+          "name": "Get bookings for term",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bookingUrl}}/api/bookings/event-term/{{eventTermId}}",
+              "host": ["{{bookingUrl}}"],
+              "path": ["api", "bookings", "event-term", "{{eventTermId}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel booking",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{bookingUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{bookingUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Create payment (ACCOUNTANT)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "bookingId", "value": "{{bookingId}}" },
+                { "key": "organizationId", "value": "{{organizationId}}" },
+                { "key": "amount", "value": "15.00" },
+                { "key": "parentEmail", "value": "parent@example.com" },
+                { "key": "eventName", "value": "Bicycle Tour" }
+              ]
+            },
+            "url": {
+              "raw": "{{paymentUrl}}/api/payments",
+              "host": ["{{paymentUrl}}"],
+              "path": ["api", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Mark payment as paid",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{paymentUrl}}/api/payments/{{paymentId}}/pay?note=Received via bank transfer",
+              "host": ["{{paymentUrl}}"],
+              "path": ["api", "payments", "{{paymentId}}", "pay"],
+              "query": [{ "key": "note", "value": "Received via bank transfer" }]
+            }
+          }
+        },
+        {
+          "name": "Refund payment",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{paymentUrl}}/api/payments/{{paymentId}}/refund?note=Cancelled by parent",
+              "host": ["{{paymentUrl}}"],
+              "path": ["api", "payments", "{{paymentId}}", "refund"],
+              "query": [{ "key": "note", "value": "Cancelled by parent" }]
+            },
+            "description": "Refund a PAID payment (Accountant, org-scoped). Publishes the PaymentRefunded event. Idempotent on an already-refunded payment."
+          }
+        },
+        {
+          "name": "Get organization balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{paymentUrl}}/api/payments/organization/{{organizationId}}/balance",
+              "host": ["{{paymentUrl}}"],
+              "path": ["api", "payments", "organization", "{{organizationId}}", "balance"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Booklet",
+      "item": [
+        {
+          "name": "Generate organization booklet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bookletUrl}}/api/booklets/organizations/{{organizationId}}",
+              "host": ["{{bookletUrl}}"],
+              "path": ["api", "booklets", "organizations", "{{organizationId}}"]
+            },
+            "description": "Generate a PDF booklet for an organization (ORGANIZATION_OWNER or ADMIN). Takes no request body — the service gathers organization, event and sponsor data itself. Returns application/pdf binary."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -99,7 +99,6 @@ public class BookingQueryService {
     }
 
     public List<String> getParticipantParentEmails(UUID eventTermId) {
-        List<Booking> a = bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
         return bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED).stream()
                 .map(b -> identityServiceClient.getOwnerEmail(b.getFamilyMemberId()))
                 .filter(email -> email != null)

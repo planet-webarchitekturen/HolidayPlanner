@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,14 +34,6 @@ public class IdentityServiceClient {
         this.serviceSecret = serviceSecret;
     }
 
-    public String getOwnerEmail(UUID familyMemberId) {
-        return fetchStringField(familyMemberId, "owner-email", "email", "owner email");
-    }
-
-    public String getFamilyMemberDisplayName(UUID familyMemberId) {
-        return fetchStringField(familyMemberId, "display-name", "name", "display name");
-    }
-
     public FamilyMemberResponse getFamilyMember(UUID familyMemberId) {
         String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId;
         try {
@@ -48,7 +41,11 @@ public class IdentityServiceClient {
                     .uri(url)
                     .headers(headers -> {
                         String token = extractCurrentToken();
-                        if (token != null) headers.setBearerAuth(token);
+                        if (token != null) {
+                            headers.setBearerAuth(token);
+                        } else {
+                            headers.set("X-Service-Secret", serviceSecret);
+                        }
                     })
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
@@ -64,6 +61,27 @@ public class IdentityServiceClient {
             throw new IdentityServiceException("Identity service unavailable", e);
         } catch (RestClientException e) {
             throw new IdentityServiceException("Identity service error: " + e.getMessage(), e);
+        }
+    }
+
+    public String getOwnerEmail(UUID familyMemberId) {
+        return fetchStringField(familyMemberId, "owner-email", "email", "owner email");
+    }
+
+    public String getFamilyMemberDisplayName(UUID familyMemberId) {
+        return fetchStringField(familyMemberId, "display-name", "name", "display name");
+    }
+
+    public LocalDate getFamilyMemberBirthDate(UUID familyMemberId) {
+        String value = fetchStringField(familyMemberId, "birth-date", "birthDate", "birth date");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (Exception e) {
+            log.warn("Could not parse birth date '{}' for family member {}", value, familyMemberId);
+            return null;
         }
     }
 
@@ -87,13 +105,16 @@ public class IdentityServiceClient {
         try {
             ServletRequestAttributes attrs =
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return null;
+            if (attrs == null) {
+                return null;
+            }
             HttpServletRequest request = attrs.getRequest();
             String header = request.getHeader("Authorization");
             if (header != null && header.startsWith("Bearer ")) {
                 return header.substring(7);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return null;
     }
 }

@@ -23,6 +23,9 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
+    @Value("${jwt.refresh-expiration-ms:604800000}") // 7 days
+    private long refreshExpirationMs;
+
     public String generateToken(UUID userId, UUID organizationId, List<String> roles, String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationMs);
@@ -37,26 +40,43 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    /** Long-lived token carrying {@code type=refresh}; exchanged at /api/auth/refresh for a new access token. */
+    public String generateRefreshToken(UUID userId, UUID organizationId, List<String> roles, String email) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshExpirationMs);
+        return Jwts.builder()
+                .subject(userId.toString())
+                .claim("organizationId", organizationId != null ? organizationId.toString() : null)
+                .claim("roles", roles)
+                .claim("email", email)
+                .claim("type", "refresh")
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(getSigningKey())
+                .compact();
     }
 
-    public UUID getUserIdFromToken(String token) {
-    Claims claims = parseClaims(token);
-    return UUID.fromString(claims.getSubject());
-    }
-
-    public UUID getOrganizationIdFromToken(String token) {
-        Claims claims = parseClaims(token);
-        return UUID.fromString(claims.get("organizationId", String.class));
-    }
-
-    private Claims parseClaims(String token) {
+    /** Parse + verify a token's signature and expiry; throws {@link io.jsonwebtoken.JwtException} if invalid. */
+    public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public UUID getUserIdFromToken(String token) {
+        Claims claims = parseClaims(token);
+        return UUID.fromString(claims.getSubject());
+    }
+
+    public UUID getOrganizationIdFromToken(String token) {
+        Claims claims = parseClaims(token);
+        return UUID.fromString(claims.get("organizationId", String.class));
     }
 
 }

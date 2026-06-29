@@ -34,7 +34,10 @@ public class BookingCreatedConsumer {
                   payload.getParentEmail(),
                   payload.getEventName(),
                   payload.getTermDate(),
-                  payload.getStatus()));
+                  payload.getStatus(),
+                  payload.getMeetingPoint(),
+                  payload.getPaymentMethod(),
+                  payload.getAmount()));
     } catch (Exception e) {
       log.error("Failed to process BookingCreated event: {}", e.getMessage());
       throw e;

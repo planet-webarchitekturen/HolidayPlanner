@@ -11,14 +11,6 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.UUID;
 
-/**
- * HTTP client for calling booking-service from identity-service.
- * Used for composition queries to enrich user profiles with booking information.
- * 
- * Follows the same pattern as booking-service's EventServiceClient.
- * Uses fail-safe behavior for delete veto checks: if booking-service cannot be
- * reached or returns an error, deletion is rejected.
- */
 @Slf4j
 @Component
 public class BookingServiceClient {
@@ -36,13 +28,6 @@ public class BookingServiceClient {
         this.serviceSecret = serviceSecret;
     }
 
-    /**
-     * Get the count of active (CONFIRMED or WAITLISTED, non-CANCELLED) bookings for a family member.
-     * 
-     * @param familyMemberId the family member ID
-     * @return count of active bookings
-     * @throws ActiveBookingVetoException if booking-service cannot complete the veto check
-     */
     public long getActiveBookingCount(UUID familyMemberId) {
         String url = bookingServiceUrl + "/api/bookings/family-member/" + familyMemberId + "/has-active";
         try {
@@ -51,36 +36,38 @@ public class BookingServiceClient {
                     .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        throw new ActiveBookingVetoException(
-                                "Cannot verify active bookings for family member " + familyMemberId
-                                        + "; deletion rejected");
+                        throw vetoException(familyMemberId, null);
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        throw new ActiveBookingVetoException(
-                                "Cannot verify active bookings for family member " + familyMemberId
-                                        + "; deletion rejected");
+                        throw vetoException(familyMemberId, null);
                     })
                     .body(ActiveBookingCheckResponse.class);
-            
+
             if (response == null) {
-                throw new ActiveBookingVetoException(
-                        "Cannot verify active bookings for family member " + familyMemberId
-                                + "; deletion rejected");
+                throw vetoException(familyMemberId, null);
             }
             return response.getActiveBookingCount();
         } catch (ActiveBookingVetoException e) {
             throw e;
         } catch (ResourceAccessException e) {
             log.warn("Booking service unavailable when querying bookings for familyMemberId {}", familyMemberId, e);
-            throw new ActiveBookingVetoException(
-                    "Cannot verify active bookings for family member " + familyMemberId
-                            + "; deletion rejected", e);
+            throw vetoException(familyMemberId, e);
         } catch (RestClientException e) {
             log.warn("Booking service error for familyMemberId {}: {}", familyMemberId, e.getMessage());
-            throw new ActiveBookingVetoException(
-                    "Cannot verify active bookings for family member " + familyMemberId
-                            + "; deletion rejected", e);
+            throw vetoException(familyMemberId, e);
         }
+    }
+
+    public boolean hasActiveBookings(UUID familyMemberId) {
+        return getActiveBookingCount(familyMemberId) > 0;
+    }
+
+    private ActiveBookingVetoException vetoException(UUID familyMemberId, Throwable cause) {
+        String message = "Cannot verify active bookings for family member " + familyMemberId
+                + "; deletion rejected";
+        return cause == null
+                ? new ActiveBookingVetoException(message)
+                : new ActiveBookingVetoException(message, cause);
     }
 
     public static class ActiveBookingCheckResponse {

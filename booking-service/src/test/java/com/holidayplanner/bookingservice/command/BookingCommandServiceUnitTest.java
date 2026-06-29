@@ -13,14 +13,18 @@ import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
+import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.PaymentMethod;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -71,6 +75,10 @@ class BookingCommandServiceUnitTest {
         d.setStartDateTime(LocalDateTime.now().plusDays(14));
         d.setMinimalAge(6);
         d.setMaximalAge(16);
+        d.setEventName("Bike Adventure");
+        d.setMeetingPoint("Main gate");
+        d.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+        d.setPrice(new BigDecimal("12.50"));
         return d;
     }
 
@@ -127,7 +135,11 @@ class BookingCommandServiceUnitTest {
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         assertThat(result.getFamilyMemberId()).isEqualTo(FAMILY_MEMBER_ID);
         assertThat(result.getEventTermId()).isEqualTo(EVENT_TERM_ID);
-        verify(bookingEventProducer).publishBookingCreated(any());
+        ArgumentCaptor<BookingCreatedPayload> payload = ArgumentCaptor.forClass(BookingCreatedPayload.class);
+        verify(bookingEventProducer).publishBookingCreated(payload.capture());
+        assertThat(payload.getValue().getMeetingPoint()).isEqualTo("Main gate");
+        assertThat(payload.getValue().getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        assertThat(payload.getValue().getAmount()).isEqualByComparingTo("12.50");
     }
 
     @Test
@@ -357,6 +369,57 @@ class BookingCommandServiceUnitTest {
                 .hasMessageContaining("unavailable");
 
         verify(bookingRepository, never()).save(any());
+    }
+
+    // ── createBooking integrity guards (Story 1) ──────────────────────────────
+
+    @Test
+    void createBooking_whenChildTooYoung_throws400AndNothingPersisted() {
+        EventTermDetailResponse term = activeEventTerm(10);
+        term.setMinimalAge(8);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(term, 5));
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_beforeBookingWindow_throwsConflictAndNothingPersisted() {
+        UUID orgId = UUID.randomUUID();
+        EventTermDetailResponse term = activeEventTerm(10);
+        term.setOrganizationId(orgId);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(term, 10));
+        OrganizationResponse org = new OrganizationResponse();
+        org.setBookingStartTime(LocalDateTime.now().plusDays(5));
+        when(organizationServiceClient.getOrganization(orgId)).thenReturn(org);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_duplicateMemberAndTerm_throwsConflictAndNothingPersisted() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(true);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
     }
 
     // ── cancelBooking ─────────────────────────────────────────────────────────

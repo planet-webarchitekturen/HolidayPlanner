@@ -36,4 +36,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findActiveBookingsByFamilyMember(@Param("familyMemberId") UUID familyMemberId);
 
     List<Booking> findByEventTermIdAndSagaCancelledTrue(UUID eventTermId);
+
+    // Duplicate-booking guard: an existing non-CANCELLED booking for the same member+term.
+    boolean existsByFamilyMemberIdAndEventTermIdAndStatusNot(UUID familyMemberId, UUID eventTermId, BookingStatus status);
 }

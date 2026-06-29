@@ -5,6 +5,8 @@ import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
+import com.holidayplanner.shared.model.BookingStatus;
+import com.holidayplanner.shared.model.CancelledBy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,10 +34,12 @@ class BookingEventProducerTest {
                 bookingId,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "CONFIRMED",
+                BookingStatus.CONFIRMED,
                 "parent@example.test",
                 "Summer Camp",
                 "2026-07-01T09:00:00",
+                null,
+                null,
                 UUID.randomUUID(),
                 BigDecimal.TEN);
 
@@ -55,7 +59,7 @@ class BookingEventProducerTest {
                 "parent@example.test",
                 "Summer Camp",
                 "2026-07-01T09:00:00",
-                "parent",
+                CancelledBy.USER,
                 UUID.randomUUID(),
                 UUID.randomUUID());
 

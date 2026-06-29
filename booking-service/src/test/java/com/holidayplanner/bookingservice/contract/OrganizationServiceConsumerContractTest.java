@@ -1,24 +1,20 @@
 package com.holidayplanner.bookingservice.contract;
 
-import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.OrganizationServiceException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -39,13 +35,9 @@ class OrganizationServiceConsumerContractTest {
     void setUp() {
         organizationServiceClient = new OrganizationServiceClient(
                 RestClient.builder(),
-                wm.baseUrl()
+                wm.baseUrl(),
+                "holidayplanner-internal-service-secret"
         );
-    }
-
-    @AfterEach
-    void tearDown() {
-        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -68,9 +60,8 @@ class OrganizationServiceConsumerContractTest {
     }
 
     @Test
-    void getOrganization_sendsGetToCorrectPathAndForwardsBearerToken() {
+    void getOrganization_sendsGetToCorrectPathAndServiceSecret() {
         UUID organizationId = UUID.randomUUID();
-        withBearerToken("booking-token");
         wm.stubFor(get(urlEqualTo("/api/organizations/" + organizationId))
                 .willReturn(okJson("""
                         {"id":"%s","bookingStartTime":"2026-06-24T10:15:30"}
@@ -79,7 +70,7 @@ class OrganizationServiceConsumerContractTest {
         organizationServiceClient.getOrganization(organizationId);
 
         wm.verify(1, getRequestedFor(urlEqualTo("/api/organizations/" + organizationId))
-                .withHeader("Authorization", WireMock.equalTo("Bearer booking-token")));
+                .withHeader("X-Service-Secret", equalTo("holidayplanner-internal-service-secret")));
     }
 
     @Test
@@ -108,17 +99,12 @@ class OrganizationServiceConsumerContractTest {
     void getOrganization_whenConnectionRefused_throwsOrganizationServiceException() {
         OrganizationServiceClient unreachable = new OrganizationServiceClient(
                 RestClient.builder(),
-                "http://localhost:1"
+                "http://localhost:1",
+                "holidayplanner-internal-service-secret"
         );
 
         assertThatThrownBy(() -> unreachable.getOrganization(UUID.randomUUID()))
                 .isInstanceOf(OrganizationServiceException.class)
                 .hasMessageContaining("unavailable");
-    }
-
-    private void withBearerToken(String token) {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("Authorization", "Bearer " + token);
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 }

@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,8 +80,6 @@ class PaymentCommandServiceTest {
         assertEquals(organizationId, captor.getValue().getOrganizationId());
     }
 
-    // ── restoreVoidedPayment ──────────────────────────────────────────────────
-
     @Test
     void restoreVoidedPayment_voidedPayment_isRestoredToPending() {
         UUID bookingId = UUID.randomUUID();
@@ -121,6 +120,46 @@ class PaymentCommandServiceTest {
 
         paymentCommandService.restoreVoidedPayment(bookingId);
 
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void refundPaymentRejectsPendingPayment() {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = new Payment();
+        payment.setId(paymentId);
+        payment.setStatus(PaymentStatus.PENDING);
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+        assertThrows(IllegalStateException.class, () -> paymentCommandService.refundPayment(paymentId, null));
+        verify(paymentEventProducer, never()).publishPaymentRefunded(any());
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void markAsPaidRejectsRefundedPayment() {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = new Payment();
+        payment.setId(paymentId);
+        payment.setStatus(PaymentStatus.REFUNDED);
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+        assertThrows(IllegalStateException.class, () -> paymentCommandService.markAsPaid(paymentId, null));
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void refundPaymentIsIdempotentWhenAlreadyRefunded() {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = new Payment();
+        payment.setId(paymentId);
+        payment.setStatus(PaymentStatus.REFUNDED);
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+        Payment result = paymentCommandService.refundPayment(paymentId, "again");
+
+        assertEquals(PaymentStatus.REFUNDED, result.getStatus());
+        verify(paymentEventProducer, never()).publishPaymentRefunded(any());
         verify(paymentRepository, never()).save(any());
     }
 }

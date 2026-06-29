@@ -2,15 +2,12 @@ package com.holidayplanner.bookingservice.client;
 
 import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.OrganizationServiceException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.UUID;
 
@@ -19,12 +16,15 @@ public class OrganizationServiceClient {
 
     private final RestClient restClient;
     private final String organizationServiceUrl;
+    private final String serviceSecret;
 
     public OrganizationServiceClient(
             RestClient.Builder restClientBuilder,
-            @Value("${services.organization-service.url:http://localhost:8084}") String organizationServiceUrl) {
+            @Value("${services.organization-service.url:http://localhost:8084}") String organizationServiceUrl,
+            @Value("${service.secret:holidayplanner-internal-service-secret}") String serviceSecret) {
         this.restClient = restClientBuilder.build();
         this.organizationServiceUrl = organizationServiceUrl;
+        this.serviceSecret = serviceSecret;
     }
 
     public OrganizationResponse getOrganization(UUID organizationId) {
@@ -32,12 +32,7 @@ public class OrganizationServiceClient {
         try {
             return restClient.get()
                     .uri(url)
-                    .headers(headers -> {
-                        String token = extractCurrentToken();
-                        if (token != null) {
-                            headers.setBearerAuth(token);
-                        }
-                    })
+                    .header("X-Service-Secret", serviceSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         throw new IllegalStateException("Organization not found: " + organizationId);
@@ -53,19 +48,5 @@ public class OrganizationServiceClient {
         } catch (RestClientException e) {
             throw new OrganizationServiceException("Organization service error: " + e.getMessage(), e);
         }
-    }
-
-    private String extractCurrentToken() {
-        try {
-            ServletRequestAttributes attrs =
-                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return null;
-            HttpServletRequest request = attrs.getRequest();
-            String header = request.getHeader("Authorization");
-            if (header != null && header.startsWith("Bearer ")) {
-                return header.substring(7);
-            }
-        } catch (Exception ignored) {}
-        return null;
     }
 }

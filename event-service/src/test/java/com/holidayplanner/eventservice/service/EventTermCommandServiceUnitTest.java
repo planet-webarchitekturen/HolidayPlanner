@@ -130,7 +130,6 @@ class EventTermCommandServiceUnitTest {
     void sendMessage_whenActive_publishesParticipantMessageRequested() {
         term.setStatus(EventTermStatus.ACTIVE);
         when(eventTermRepository.findByIdWithEvent(termId)).thenReturn(Optional.of(term));
-        when(bookingServicePort.getParticipantParentEmails(termId)).thenReturn(List.of("p@example.com"));
 
         commandService.sendMessageToParticipants(termId, "Subject", "Hello");
 
@@ -138,7 +137,6 @@ class EventTermCommandServiceUnitTest {
                 ArgumentCaptor.forClass(ParticipantMessageRequestedPayload.class);
         verify(eventTermEventPublisher).publishParticipantMessageRequested(payload.capture());
         assertThat(payload.getValue().getEventTermId()).isEqualTo(termId);
-        assertThat(payload.getValue().getRecipients()).containsExactly("p@example.com");
         assertThat(payload.getValue().getSubject()).isEqualTo("Subject");
         assertThat(payload.getValue().getBody()).isEqualTo("Hello");
     }

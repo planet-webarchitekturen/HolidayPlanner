@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.holidayplanner.paymentservice.repository.PaymentRepository;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
+import com.holidayplanner.shared.model.CancelledBy;
 import com.holidayplanner.shared.model.Payment;
 import com.holidayplanner.shared.model.PaymentStatus;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class BookingCancelledConsumerTest {
     private String cancelledMessage(UUID bookingId) throws Exception {
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 bookingId, UUID.randomUUID(), UUID.randomUUID(),
-                "parent@example.test", "Swimming", "2025-10-01", "term-cancelled",
+                "parent@example.test", "Swimming", "2025-10-01", CancelledBy.SYSTEM,
                 UUID.randomUUID(), UUID.randomUUID());
         KafkaEnvelope<BookingCancelledPayload> envelope = new KafkaEnvelope<>(
                 "BookingCancelled", "1", "2025-01-01T00:00:00", "booking-service", payload);
