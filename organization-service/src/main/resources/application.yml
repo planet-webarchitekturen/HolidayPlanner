@@ -42,3 +42,8 @@ services:
     url: ${IDENTITY_SERVICE_URL:http://localhost:8083}
   event-service:
     url: ${EVENT_SERVICE_URL:http://localhost:8081}
+
+# Transactional outbox relay: how often the poller publishes pending events to Kafka.
+outbox:
+  relay:
+    fixed-delay-ms: ${OUTBOX_RELAY_FIXED_DELAY_MS:2000}

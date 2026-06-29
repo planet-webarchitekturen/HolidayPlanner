@@ -28,3 +28,9 @@ services:
     url: http://localhost:8083
   event-service:
     url: http://localhost:8081
+
+# Keep the outbox relay effectively dormant during tests (no broker available); the relay is
+# unit-tested directly in OrganizationOutboxRelayTest instead.
+outbox:
+  relay:
+    fixed-delay-ms: 3600000

@@ -72,6 +72,21 @@ sequenceDiagram
 | T8   | Publish final completion events such as `OrganizationDeleted`  | owning service         | Retriable                   | None; retry until published                                             |
 | T9   | Send cancellation and refund notifications                     | `notification-service` | Retriable side effect       | None; retry or dead-letter for manual handling                          |
 
+## Reliability: transactional outbox
+
+All organization events (`OrganizationDeletionStarted`, `OrganizationDeleted`,
+`OrganizationDeletionRolledBack`, `OrganizationCreated`) are published through a **transactional
+outbox**, not sent inline. Each saga step that changes the organization's state runs in a single
+transaction (`OrganizationCommandService` / `OrganizationDeletionFinalizer` are `@Transactional`)
+that writes both the state change **and** an `organization_outbox_events` row atomically. A scheduled
+`OrganizationOutboxRelay` then publishes pending rows to Kafka and marks them processed only after the
+broker acknowledges the send (at-least-once delivery).
+
+This removes the dual-write problem of the previous direct `KafkaTemplate.send` (whose failures were
+only logged): an event is now never lost when the broker is briefly unavailable, and never published
+for a step whose transaction rolled back. Consumers already key on `organizationId` and are
+idempotent, which tolerates the at-least-once re-delivery.
+
 ## Findings
 
 - The pivot is not always obvious when several irreversible or externally visible actions exist.

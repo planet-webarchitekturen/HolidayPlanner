@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,5 +111,72 @@ class OrganizationControllerComponentTest {
                         .param("name", "Forbidden Org")
                         .param("bankAccount", "AT00"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createOrganization_duplicateName_returns409() throws Exception {
+        createOrganization("Gemeinde Feldkirch", "AT11 1111");
+
+        mockMvc.perform(post("/api/organizations")
+                        .header(HttpHeaders.AUTHORIZATION, ADMIN)
+                        .param("name", "Gemeinde Feldkirch")
+                        .param("bankAccount", "AT22 2222"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void addTeamMemberAndSponsor_asAdmin_succeed() throws Exception {
+        UUID orgId = createOrganization("Gemeinde Lustenau", "AT33 3333");
+
+        mockMvc.perform(post("/api/organizations/{id}/team-members", orgId)
+                        .header(HttpHeaders.AUTHORIZATION, ADMIN)
+                        .param("userId", UUID.randomUUID().toString())
+                        .param("firstName", "Mia")
+                        .param("lastName", "Keller")
+                        .param("email", "mia@org.test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Mia"));
+
+        mockMvc.perform(post("/api/organizations/{id}/sponsors", orgId)
+                        .header(HttpHeaders.AUTHORIZATION, ADMIN)
+                        .param("name", "Acme AG")
+                        .param("amount", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Acme AG"));
+    }
+
+    @Test
+    void deleteOrganization_asAdmin_startsSagaAndMarksDeleting() throws Exception {
+        UUID orgId = createOrganization("Gemeinde Hard", "AT44 4444");
+
+        mockMvc.perform(delete("/api/organizations/{id}", orgId)
+                        .header(HttpHeaders.AUTHORIZATION, ADMIN))
+                .andExpect(status().isNoContent());
+
+        assertThat(organizationRepository.findById(orgId)).isPresent()
+                .get()
+                .extracting(o -> o.getStatus().name())
+                .isEqualTo("DELETING");
+    }
+
+    @Test
+    void deleteOrganization_asNonAdmin_returns403() throws Exception {
+        UUID orgId = createOrganization("Gemeinde Lochau", "AT55 5555");
+
+        mockMvc.perform(delete("/api/organizations/{id}", orgId)
+                        .header(HttpHeaders.AUTHORIZATION, USER))
+                .andExpect(status().isForbidden());
+    }
+
+    /** Creates an organization via the API and returns its generated id. */
+    private UUID createOrganization(String name, String bankAccount) throws Exception {
+        String body = mockMvc.perform(post("/api/organizations")
+                        .header(HttpHeaders.AUTHORIZATION, ADMIN)
+                        .param("name", name)
+                        .param("bankAccount", bankAccount))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return UUID.fromString(new ObjectMapper().readTree(body).get("id").asText());
     }
 }

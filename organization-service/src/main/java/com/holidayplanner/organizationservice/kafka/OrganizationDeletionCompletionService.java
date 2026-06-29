@@ -1,10 +1,5 @@
 package com.holidayplanner.organizationservice.kafka;
 
-import com.holidayplanner.organizationservice.repository.OrganizationRepository;
-import com.holidayplanner.shared.kafka.payload.OrganizationDeletedPayload;
-import com.holidayplanner.shared.kafka.payload.OrganizationDeletionRolledBackPayload;
-import com.holidayplanner.shared.model.Organization;
-import com.holidayplanner.shared.model.OrganizationStatus;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +22,7 @@ public class OrganizationDeletionCompletionService {
     private static final long QUIET_PERIOD_SECONDS = 5;
     private static final long MAX_WAIT_SECONDS = 20;
 
-    private final OrganizationRepository organizationRepository;
-    private final OrganizationEventProducer organizationEventProducer;
+    private final OrganizationDeletionFinalizer deletionFinalizer;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<UUID, ScheduledFuture<?>> pendingFinalization = new ConcurrentHashMap<>();
@@ -85,19 +79,9 @@ public class OrganizationDeletionCompletionService {
     private void finalizeIfStillDeleting(UUID organizationId) {
         try {
             pendingFinalization.remove(organizationId);
-            Organization org = organizationRepository.findById(organizationId).orElse(null);
-            if (org == null || org.getStatus() != OrganizationStatus.DELETING) {
-                return; // already finalized, or organization no longer exists
-            }
-
-            org.setStatus(OrganizationStatus.DELETED);
-            organizationRepository.save(org);
-
-            OrganizationDeletedPayload payload = new OrganizationDeletedPayload(org.getId(), org.getName());
-            organizationEventProducer.publishOrganizationDeleted(payload);
-
-            log.info("Organization deletion saga completed for {} (no further activity for {}s)",
-                    organizationId, QUIET_PERIOD_SECONDS);
+            // The actual state change + outbox event run in a transaction on the finalizer bean.
+            deletionFinalizer.finalizeIfStillDeleting(organizationId);
+            pivotCrossed.remove(organizationId);
         } catch (Exception e) {
             log.error("Failed to finalize organization deletion for {}: {}", organizationId, e.getMessage(), e);
         }
