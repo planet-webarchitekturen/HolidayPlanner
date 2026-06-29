@@ -1,9 +1,9 @@
 package com.holidayplanner.identityservice.controller;
 
-import com.holidayplanner.shared.model.User;
 import com.holidayplanner.identityservice.command.IdentityCommandService;
 import com.holidayplanner.identityservice.dto.*;
 import com.holidayplanner.identityservice.query.IdentityQueryService;
+import com.holidayplanner.shared.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +14,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Identity Service Controller.
- * 
- * Routes requests to appropriate services following CQRS pattern:
- * - POST/PATCH/DELETE endpoints → IdentityCommandService (write operations)
- * - GET endpoints → IdentityQueryService (read operations)
- */
 @RestController
 @RequiredArgsConstructor
 public class IdentityController {
@@ -28,13 +21,10 @@ public class IdentityController {
     private final IdentityCommandService commandService;
     private final IdentityQueryService queryService;
 
-    // --- Health Check ---
     @GetMapping("/api/identity/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("IdentityService is running!");
     }
-
-    // --- Authentication Endpoints ---
 
     @PostMapping({"/api/auth/register", "/api/identity/users/register"})
     public ResponseEntity<UserResponse> register(
@@ -49,26 +39,39 @@ public class IdentityController {
     @PostMapping({"/api/auth/login", "/api/identity/auth/login"})
     public ResponseEntity<LoginResponse> login(
             @RequestBody LoginRequest loginRequest) {
-        String token = queryService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
-        User user = queryService.getUserByEmail(loginRequest.getEmail());
-        return ResponseEntity.ok(new LoginResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getPhoneNumber(),
-                user.getOrganizationId(),
-                user.getRole(),
-                token,
-                queryService.issueRefreshToken(user)
-        ));
+        try {
+            var tokens = queryService.loginUserWithRefresh(loginRequest.getEmail(), loginRequest.getPassword());
+            User user = queryService.getUserByEmail(loginRequest.getEmail());
+            return ResponseEntity.ok(new LoginResponse(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getPhoneNumber(),
+                    user.getOrganizationId(),
+                    user.getRole(),
+                    tokens.accessToken(),
+                    tokens.refreshToken()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
     }
 
-    /** Exchange a valid refresh token for a fresh access token without re-entering credentials. */
     @PostMapping({"/api/auth/refresh", "/api/identity/auth/refresh"})
     public ResponseEntity<LoginResponse> refresh(@RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(queryService.refresh(request.getRefreshToken()));
+        try {
+            var result = queryService.loginWithRefreshToken(request.getRefreshToken());
+            User user = queryService.getUserById(result.userId());
+            return ResponseEntity.ok(new LoginResponse(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getPhoneNumber(),
+                    user.getOrganizationId(),
+                    user.getRole(),
+                    result.accessToken(),
+                    result.refreshToken()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
     }
-
-    // --- User Endpoints ---
 
     @GetMapping("/api/identity/users")
     @PreAuthorize("hasRole('ADMIN')")
@@ -103,8 +106,6 @@ public class IdentityController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- FamilyMember Endpoints ---
-
     @GetMapping("/api/identity/users/{userId}/family-members")
     @PreAuthorize("@identitySecurity.isSelf(#userId, authentication)")
     public ResponseEntity<List<FamilyMemberResponse>> getFamilyMembers(@PathVariable("userId") UUID userId) {
@@ -127,7 +128,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}")
-    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER', 'SERVICE')")
     public ResponseEntity<FamilyMemberResponse> getFamilyMember(@PathVariable("memberId") UUID memberId) {
         return ResponseEntity.ok(FamilyMemberResponse.from(queryService.getFamilyMemberById(memberId)));
     }
@@ -145,7 +146,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/owner-email")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
+    @PreAuthorize("@identitySecurity.isFamilyMemberOwner(#memberId, authentication) or hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER','SERVICE')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberOwnerEmail(
             @PathVariable("memberId") UUID memberId) {
         String email = queryService.getUserEmailByFamilyMemberId(memberId);
@@ -153,7 +154,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/family-members/{memberId}/display-name")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER', 'SERVICE')")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_TEAM_MEMBER','ADMIN','EVENT_OWNER')")
     public ResponseEntity<java.util.Map<String, String>> getFamilyMemberDisplayName(
             @PathVariable("memberId") UUID memberId) {
         String name = queryService.getFamilyMemberDisplayName(memberId);
@@ -175,9 +176,6 @@ public class IdentityController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- Caregiver Endpoints ---
-
-    //CHECK: Can only Admins and event owners create caregivers? or anyone?
     @PostMapping("/api/identity/caregivers")
     @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN')")
     public ResponseEntity<CaregiverResponse> createCaregiver(
@@ -199,7 +197,7 @@ public class IdentityController {
     }
 
     @GetMapping("/api/identity/caregivers/{caregiverId}")
-    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER','SERVICE')")
+    @PreAuthorize("hasAnyRole('EVENT_OWNER','ADMIN','ORGANIZATION_TEAM_MEMBER')")
     public ResponseEntity<CaregiverResponse> getCaregiver(@PathVariable("caregiverId") UUID caregiverId) {
         return ResponseEntity.ok(CaregiverResponse.from(queryService.getCaregiverById(caregiverId)));
     }

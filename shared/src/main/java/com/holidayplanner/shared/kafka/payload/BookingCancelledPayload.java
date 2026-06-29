@@ -18,4 +18,17 @@ public class BookingCancelledPayload {
     private String eventName;
     private String termDate;
     private CancelledBy cancelledBy;
+    private UUID organizationId;
+    private UUID eventId;
+
+    public BookingCancelledPayload(UUID bookingId,
+                                   UUID familyMemberId,
+                                   UUID eventTermId,
+                                   String parentEmail,
+                                   String eventName,
+                                   String termDate,
+                                   CancelledBy cancelledBy) {
+        this(bookingId, familyMemberId, eventTermId, parentEmail, eventName, termDate,
+                cancelledBy, null, null);
+    }
 }

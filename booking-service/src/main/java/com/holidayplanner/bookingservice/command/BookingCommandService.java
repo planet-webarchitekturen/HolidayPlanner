@@ -5,12 +5,14 @@ import com.holidayplanner.bookingservice.client.IdentityServiceClient;
 import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
-import com.holidayplanner.bookingservice.dto.OrganizationDto;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
@@ -20,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +32,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class BookingCommandService {
 
@@ -38,6 +42,10 @@ public class BookingCommandService {
     private final OrganizationServiceClient organizationServiceClient;
     private final BookingEventProducer bookingEventProducer;
 
+    private static final List<BookingStatus> ACTIVE_BOOKING_STATUSES = List.of(
+            BookingStatus.CONFIRMED,
+            BookingStatus.WAITLISTED);
+
     public BookingResponse createBooking(UUID familyMemberId, UUID eventTermId) {
         EventTermDetailResponse eventTerm = eventServiceClient.getEventTerm(eventTermId);
 
@@ -45,8 +53,6 @@ public class BookingCommandService {
             throw new IllegalStateException("Event term is not active: " + eventTermId);
         }
 
-        // Cross-org check: only non-USER roles are org-scoped (parents/guardians can
-        // book any org's events)
         if (!SecurityUtils.hasRole("USER") && !SecurityUtils.hasRole("SERVICE")) {
             UUID currentOrgId = SecurityUtils.getCurrentOrganizationId();
             if (currentOrgId != null && eventTerm.getOrganizationId() != null
@@ -55,32 +61,14 @@ public class BookingCommandService {
             }
         }
 
-        // Story 1 — Duplicate guard: the same member must not book the same term twice (409).
-        if (bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusNot(
-                familyMemberId, eventTermId, BookingStatus.CANCELLED)) {
-            throw new IllegalStateException(
-                    "Family member " + familyMemberId + " already has a booking for event term " + eventTermId);
+        if (bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                familyMemberId, eventTermId, ACTIVE_BOOKING_STATUSES)) {
+            throw new IllegalStateException("Family member already has an active booking for this event term");
         }
 
-        // Story 1 — Age guard: child must satisfy the event's age range (400).
-        LocalDate birthDate = identityServiceClient.getFamilyMemberBirthDate(familyMemberId);
-        if (birthDate != null) {
-            int age = Period.between(birthDate, LocalDate.now()).getYears();
-            int min = eventTerm.getMinimalAge();
-            int max = eventTerm.getMaximalAge();
-            if (age < min || (max > 0 && age > max)) {
-                throw new IllegalArgumentException("Family member age " + age
-                        + " is outside the allowed range [" + min + ", " + max + "] for this event");
-            }
-        }
-
-        // Story 1 — Booking-window guard: reject bookings before the organization's bookingStartTime (409).
-        OrganizationDto organization = organizationServiceClient.getOrganization(eventTerm.getOrganizationId());
-        if (organization != null && organization.getBookingStartTime() != null
-                && LocalDateTime.now().isBefore(organization.getBookingStartTime())) {
-            throw new IllegalStateException(
-                    "Booking is not open yet for this organization (opens " + organization.getBookingStartTime() + ")");
-        }
+        FamilyMemberResponse familyMember = identityServiceClient.getFamilyMember(familyMemberId);
+        validateAge(familyMember, eventTerm);
+        validateBookingWindow(eventTerm);
 
         long confirmedCount = bookingRepository.countByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
 
@@ -108,28 +96,61 @@ public class BookingCommandService {
         return BookingResponse.from(saved);
     }
 
-    public BookingResponse cancelBooking(UUID bookingId) {
+    private void validateAge(FamilyMemberResponse familyMember, EventTermDetailResponse eventTerm) {
+        if (familyMember == null || familyMember.getBirthDate() == null) {
+            throw new IllegalArgumentException("Family member birth date is required");
+        }
+        if (eventTerm.getMinimalAge() == null || eventTerm.getMaximalAge() == null) {
+            throw new IllegalStateException("Event term age limits are missing");
+        }
 
+        LocalDate referenceDate = eventTerm.getStartDateTime() != null
+                ? eventTerm.getStartDateTime().toLocalDate()
+                : LocalDate.now();
+        int age = Period.between(familyMember.getBirthDate(), referenceDate).getYears();
+        if (age < eventTerm.getMinimalAge() || age > eventTerm.getMaximalAge()) {
+            throw new IllegalArgumentException("Family member does not meet age requirements");
+        }
+    }
+
+    private void validateBookingWindow(EventTermDetailResponse eventTerm) {
+        if (eventTerm.getOrganizationId() == null) {
+            throw new IllegalStateException("Event term organizationId is missing");
+        }
+
+        OrganizationResponse organization = organizationServiceClient.getOrganization(eventTerm.getOrganizationId());
+        if (organization == null) {
+            throw new IllegalStateException("Organization response is missing");
+        }
+
+        LocalDateTime bookingStartTime = organization.getBookingStartTime();
+        if (bookingStartTime != null && LocalDateTime.now().isBefore(bookingStartTime)) {
+            throw new IllegalStateException("Booking is not open yet for organization: " + eventTerm.getOrganizationId());
+        }
+    }
+
+    public BookingResponse cancelBooking(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId)); // orElse Throw catches empty returns and
-                                                                             // throws exeption therefore
-                                                                             // Optional<Booking> is not needed
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
         String parentEmail = null;
         String eventName = null;
         String termDate = null;
         LocalDateTime termStart = null;
+        UUID eventTermOrganizationId = null;
+        UUID eventTermEventId = null;
         try {
             parentEmail = identityServiceClient.getOwnerEmail(booking.getFamilyMemberId());
             EventTermDetailResponse term = eventServiceClient.getEventTerm(booking.getEventTermId());
             eventName = term.getEventName();
             termStart = term.getStartDateTime();
             termDate = termStart != null ? termStart.toString() : null;
+            eventTermOrganizationId = term.getOrganizationId();
+            eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not enrich BookingCancelledPayload for booking {}: {}", bookingId, e.getMessage());
         }
 
-        // Story 2 — a plain USER may only cancel up to 3 days before the event start; owners/admins bypass.
         boolean isUser = SecurityUtils.hasRole("USER")
                 && !SecurityUtils.hasRole("EVENT_OWNER") && !SecurityUtils.hasRole("ADMIN");
         if (isUser && termStart != null && LocalDateTime.now().isAfter(termStart.minusDays(3))) {
@@ -143,7 +164,8 @@ public class BookingCommandService {
         CancelledBy cancelledBy = isUser ? CancelledBy.USER : CancelledBy.EVENT_OWNER;
         BookingCancelledPayload payload = new BookingCancelledPayload(
                 booking.getId(), booking.getFamilyMemberId(), booking.getEventTermId(),
-                parentEmail, eventName, termDate, cancelledBy);
+                parentEmail, eventName, termDate, cancelledBy,
+                eventTermOrganizationId, eventTermEventId);
         bookingEventProducer.publishBookingCancelled(payload);
 
         UUID eventTermId = booking.getEventTermId();
@@ -157,20 +179,28 @@ public class BookingCommandService {
     public void cancelAllBookings(UUID eventTermId) {
         String eventName = null;
         String termDate = null;
+        UUID organizationId = null;
+        UUID eventTermEventId = null;
         try {
             EventTermDetailResponse term = eventServiceClient.getEventTerm(eventTermId);
             eventName = term.getEventName();
             termDate = term.getStartDateTime() != null ? term.getStartDateTime().toString() : null;
+            organizationId = term.getOrganizationId();
+            eventTermEventId = term.getEventId();
         } catch (Exception e) {
             log.warn("Could not fetch event term for cancelAllBookings: {}", e.getMessage());
         }
         final String resolvedEventName = eventName;
         final String resolvedTermDate = termDate;
+        final UUID resolvedOrganizationId = organizationId;
+        final UUID resolvedEventTermEventId = eventTermEventId;
 
         List<Booking> active = bookingRepository.findByEventTermId(eventTermId).stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .toList();
         active.forEach(b -> {
+            b.setSagaCancelled(true);
+            b.setSagaCancelledOriginalStatus(b.getStatus());
             b.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(b);
             String parentEmail = null;
@@ -181,8 +211,26 @@ public class BookingCommandService {
             }
             BookingCancelledPayload payload = new BookingCancelledPayload(
                     b.getId(), b.getFamilyMemberId(), b.getEventTermId(),
-                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.SYSTEM);
+                    parentEmail, resolvedEventName, resolvedTermDate, CancelledBy.SYSTEM,
+                    resolvedOrganizationId, resolvedEventTermEventId);
             bookingEventProducer.publishBookingCancelled(payload);
+        });
+    }
+
+    public void restoreAllBookingsForTerm(UUID eventTermId, UUID organizationId) {
+        List<Booking> sagaBookings = bookingRepository.findByEventTermIdAndSagaCancelledTrue(eventTermId);
+        sagaBookings.forEach(b -> {
+            BookingStatus originalStatus = b.getSagaCancelledOriginalStatus();
+            if (originalStatus == null) {
+                originalStatus = BookingStatus.CONFIRMED;
+            }
+            b.setStatus(originalStatus);
+            b.setSagaCancelled(false);
+            b.setSagaCancelledOriginalStatus(null);
+            bookingRepository.save(b);
+            bookingEventProducer.publishBookingRestored(
+                    new BookingRestoredPayload(b.getId(), eventTermId, organizationId));
+            log.info("Restored booking {} to {} (org rollback)", b.getId(), originalStatus);
         });
     }
 

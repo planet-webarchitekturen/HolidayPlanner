@@ -22,8 +22,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-            JwtAuthenticationFilter jwtFilter,
-            ServiceAuthenticationFilter serviceFilter) throws Exception {
+            ServiceAuthenticationFilter serviceFilter,
+            JwtAuthenticationFilter jwtFilter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/identity/health").permitAll()
                 .requestMatchers("/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/register").permitAll()
+                .requestMatchers("/api/auth/refresh").permitAll()  // ← ADDED THIS LINE
                 .requestMatchers("/api/identity/auth/login").permitAll()
                 .requestMatchers("/api/auth/refresh").permitAll()
                 .requestMatchers("/api/identity/auth/refresh").permitAll()
@@ -47,10 +48,10 @@ public class SecurityConfig {
                     res.getWriter().write("{\"error\":\"Forbidden\"}");
                 })
                 .authenticationEntryPoint((req, res, ex) -> {
-                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                res.setContentType("application/json");
-                res.getWriter().write("{\"error\":\"Unauthorized\"}");
-            }));
+                    res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"error\":\"Unauthorized\"}");
+                }));
         return http.build();
     }
 

@@ -1,13 +1,19 @@
 package com.holidayplanner.bookingservice.client;
 
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.exception.IdentityServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,6 +34,36 @@ public class IdentityServiceClient {
         this.serviceSecret = serviceSecret;
     }
 
+    public FamilyMemberResponse getFamilyMember(UUID familyMemberId) {
+        String url = identityServiceUrl + "/api/identity/family-members/" + familyMemberId;
+        try {
+            return restClient.get()
+                    .uri(url)
+                    .headers(headers -> {
+                        String token = extractCurrentToken();
+                        if (token != null) {
+                            headers.setBearerAuth(token);
+                        } else {
+                            headers.set("X-Service-Secret", serviceSecret);
+                        }
+                    })
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                        throw new IllegalArgumentException("Family member not found or not accessible: " + familyMemberId);
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new IdentityServiceException("Identity service returned server error", null);
+                    })
+                    .body(FamilyMemberResponse.class);
+        } catch (IllegalArgumentException | IdentityServiceException e) {
+            throw e;
+        } catch (ResourceAccessException e) {
+            throw new IdentityServiceException("Identity service unavailable", e);
+        } catch (RestClientException e) {
+            throw new IdentityServiceException("Identity service error: " + e.getMessage(), e);
+        }
+    }
+
     public String getOwnerEmail(UUID familyMemberId) {
         return fetchStringField(familyMemberId, "owner-email", "email", "owner email");
     }
@@ -36,14 +72,13 @@ public class IdentityServiceClient {
         return fetchStringField(familyMemberId, "display-name", "name", "display name");
     }
 
-    /** Family member's birth date for age verification, or null if it could not be resolved. */
-    public java.time.LocalDate getFamilyMemberBirthDate(UUID familyMemberId) {
+    public LocalDate getFamilyMemberBirthDate(UUID familyMemberId) {
         String value = fetchStringField(familyMemberId, "birth-date", "birthDate", "birth date");
         if (value == null || value.isBlank()) {
             return null;
         }
         try {
-            return java.time.LocalDate.parse(value);
+            return LocalDate.parse(value);
         } catch (Exception e) {
             log.warn("Could not parse birth date '{}' for family member {}", value, familyMemberId);
             return null;
@@ -70,13 +105,16 @@ public class IdentityServiceClient {
         try {
             ServletRequestAttributes attrs =
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return null;
+            if (attrs == null) {
+                return null;
+            }
             HttpServletRequest request = attrs.getRequest();
             String header = request.getHeader("Authorization");
             if (header != null && header.startsWith("Bearer ")) {
                 return header.substring(7);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return null;
     }
 }

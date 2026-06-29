@@ -1,6 +1,7 @@
 package com.holidayplanner.identityservice.command;
 
 import com.holidayplanner.identityservice.client.BookingServiceClient;
+import com.holidayplanner.identityservice.exception.ActiveBookingVetoException;
 import com.holidayplanner.identityservice.kafka.IdentityEventProducer;
 import com.holidayplanner.identityservice.repository.CaregiverRepository;
 import com.holidayplanner.identityservice.repository.FamilyMemberRepository;
@@ -168,7 +169,7 @@ class IdentityCommandServiceTest {
             when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
             FamilyMember member = familyMemberOf(existingUser);
             when(familyMemberRepository.findByUser_Id(userId)).thenReturn(List.of(member));
-            when(bookingServiceClient.hasActiveBookings(member.getId())).thenReturn(false);
+            when(bookingServiceClient.getActiveBookingCount(member.getId())).thenReturn(0L);
 
             service.deleteUser(userId);
 
@@ -183,7 +184,7 @@ class IdentityCommandServiceTest {
             when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
             FamilyMember member = familyMemberOf(existingUser);
             when(familyMemberRepository.findByUser_Id(userId)).thenReturn(List.of(member));
-            when(bookingServiceClient.hasActiveBookings(member.getId())).thenReturn(true);
+            when(bookingServiceClient.getActiveBookingCount(member.getId())).thenReturn(1L);
 
             assertThatThrownBy(() -> service.deleteUser(userId))
                     .hasMessageContaining("active bookings");
@@ -220,10 +221,29 @@ class IdentityCommandServiceTest {
             member.setId(memberId);
             member.setUser(existingUser);
             when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
-            when(bookingServiceClient.hasActiveBookings(memberId)).thenReturn(true);
+            when(bookingServiceClient.getActiveBookingCount(memberId)).thenReturn(1L);
 
             assertThatThrownBy(() -> service.removeFamilyMember(memberId))
+                    .isInstanceOf(ActiveBookingVetoException.class)
                     .hasMessageContaining("active bookings");
+
+            verify(familyMemberRepository, never()).deleteById(any());
+            verifyNoInteractions(eventProducer);
+        }
+
+        @Test
+        void removeRejectsDeletionWhenBookingServiceCannotVerifyActiveBookings() {
+            UUID memberId = UUID.randomUUID();
+            FamilyMember member = new FamilyMember();
+            member.setId(memberId);
+            member.setUser(existingUser);
+            when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
+            when(bookingServiceClient.getActiveBookingCount(memberId))
+                    .thenThrow(new ActiveBookingVetoException("Cannot verify active bookings"));
+
+            assertThatThrownBy(() -> service.removeFamilyMember(memberId))
+                    .isInstanceOf(ActiveBookingVetoException.class)
+                    .hasMessageContaining("Cannot verify active bookings");
 
             verify(familyMemberRepository, never()).deleteById(any());
             verifyNoInteractions(eventProducer);
@@ -238,7 +258,7 @@ class IdentityCommandServiceTest {
             member.setLastName("Smith");
             member.setUser(existingUser);
             when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
-            when(bookingServiceClient.hasActiveBookings(memberId)).thenReturn(false);
+            when(bookingServiceClient.getActiveBookingCount(memberId)).thenReturn(0L);
 
             service.removeFamilyMember(memberId);
 

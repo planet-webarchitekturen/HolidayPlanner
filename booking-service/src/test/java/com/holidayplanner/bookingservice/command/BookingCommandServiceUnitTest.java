@@ -5,12 +5,14 @@ import com.holidayplanner.bookingservice.client.IdentityServiceClient;
 import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
-import com.holidayplanner.bookingservice.dto.OrganizationDto;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.kafka.BookingEventProducer;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
 import com.holidayplanner.shared.model.Booking;
 import com.holidayplanner.shared.model.BookingStatus;
@@ -62,17 +64,50 @@ class BookingCommandServiceUnitTest {
     private static final UUID FAMILY_MEMBER_ID = UUID.randomUUID();
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();
     private static final UUID BOOKING_ID = UUID.randomUUID();
+    private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
     private EventTermDetailResponse activeEventTerm(int maxParticipants) {
         EventTermDetailResponse d = new EventTermDetailResponse();
         d.setId(EVENT_TERM_ID);
         d.setStatus("ACTIVE");
         d.setMaxParticipants(maxParticipants);
+        d.setOrganizationId(ORGANIZATION_ID);
+        d.setStartDateTime(LocalDateTime.now().plusDays(14));
+        d.setMinimalAge(6);
+        d.setMaximalAge(16);
         d.setEventName("Bike Adventure");
         d.setMeetingPoint("Main gate");
         d.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
         d.setPrice(new BigDecimal("12.50"));
         return d;
+    }
+
+    private FamilyMemberResponse familyMemberYearsOld(int years) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(FAMILY_MEMBER_ID);
+        r.setBirthDate(LocalDate.now().minusYears(years));
+        return r;
+    }
+
+    private FamilyMemberResponse familyMemberAgeOnTerm(EventTermDetailResponse eventTerm, int years) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(FAMILY_MEMBER_ID);
+        r.setBirthDate(eventTerm.getStartDateTime().toLocalDate().minusYears(years));
+        return r;
+    }
+
+    private OrganizationResponse openOrganization() {
+        OrganizationResponse r = new OrganizationResponse();
+        r.setId(ORGANIZATION_ID);
+        r.setBookingStartTime(LocalDateTime.now().minusDays(1));
+        return r;
+    }
+
+    private void givenBookingValidationPasses() {
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
     }
 
     private Booking booking(UUID id, UUID familyMemberId, BookingStatus status, LocalDateTime bookedAt) {
@@ -90,6 +125,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenSlotsAvailable_returnsConfirmed() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(5L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -109,6 +145,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenAtCapacity_returnsWaitlisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(10L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -121,6 +158,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenExactlyOneSlotRemains_returnsConfirmed() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(9L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -133,6 +171,7 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_whenMaxZero_alwaysWaitlisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(0));
+        givenBookingValidationPasses();
         when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
         when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
         when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
@@ -155,6 +194,157 @@ class BookingCommandServiceUnitTest {
 
         verify(bookingRepository, never()).save(any());
         verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberTooYoung_throwsBadRequestAndNothingPersistedOrPublished() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(5));
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("age requirements");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberExactlyMinimalAge_returnsConfirmed() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMinimalAge()));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberExactlyMaximalAge_returnsConfirmed() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMaximalAge()));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenFamilyMemberTooOld_throwsBadRequestAndNothingPersistedOrPublished() {
+        EventTermDetailResponse eventTerm = activeEventTerm(10);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(eventTerm);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(eventTerm, eventTerm.getMaximalAge() + 1));
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("age requirements");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenBookingWindowNotOpen_throwsConflictAndNothingPersistedOrPublished() {
+        OrganizationResponse futureOrganization = new OrganizationResponse();
+        futureOrganization.setId(ORGANIZATION_ID);
+        futureOrganization.setBookingStartTime(LocalDateTime.now().plusDays(1));
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(futureOrganization);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not open");
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenBookingStartTimeIsMissing_treatsBookingWindowAsOpen() {
+        OrganizationResponse organizationWithoutBookingWindow = new OrganizationResponse();
+        organizationWithoutBookingWindow.setId(ORGANIZATION_ID);
+        organizationWithoutBookingWindow.setBookingStartTime(null);
+
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(organizationWithoutBookingWindow);
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingEventProducer).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenActiveDuplicateExists_throwsConflictAndNothingPersistedOrPublished() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(true);
+
+        assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("active booking");
+
+        verify(identityServiceClient, never()).getFamilyMember(any());
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCreated(any());
+    }
+
+    @Test
+    void createBooking_whenOnlyCancelledBookingExists_allowsNewBooking() {
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(false);
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID)).thenReturn(familyMemberYearsOld(10));
+        when(organizationServiceClient.getOrganization(ORGANIZATION_ID)).thenReturn(openOrganization());
+        when(bookingRepository.countByEventTermIdAndStatus(EVENT_TERM_ID, BookingStatus.CONFIRMED)).thenReturn(0L);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+        when(identityServiceClient.getOwnerEmail(FAMILY_MEMBER_ID)).thenReturn("parent@example.test");
+
+        BookingResponse result = bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verify(bookingRepository).existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED));
+        verify(bookingEventProducer).publishBookingCreated(any());
     }
 
     @Test
@@ -188,8 +378,8 @@ class BookingCommandServiceUnitTest {
         EventTermDetailResponse term = activeEventTerm(10);
         term.setMinimalAge(8);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
-        when(identityServiceClient.getFamilyMemberBirthDate(FAMILY_MEMBER_ID))
-                .thenReturn(LocalDate.now().minusYears(5));
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(term, 5));
 
         assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -204,7 +394,9 @@ class BookingCommandServiceUnitTest {
         EventTermDetailResponse term = activeEventTerm(10);
         term.setOrganizationId(orgId);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
-        OrganizationDto org = new OrganizationDto();
+        when(identityServiceClient.getFamilyMember(FAMILY_MEMBER_ID))
+                .thenReturn(familyMemberAgeOnTerm(term, 10));
+        OrganizationResponse org = new OrganizationResponse();
         org.setBookingStartTime(LocalDateTime.now().plusDays(5));
         when(organizationServiceClient.getOrganization(orgId)).thenReturn(org);
 
@@ -218,8 +410,10 @@ class BookingCommandServiceUnitTest {
     @Test
     void createBooking_duplicateMemberAndTerm_throwsConflictAndNothingPersisted() {
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
-        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusNot(
-                FAMILY_MEMBER_ID, EVENT_TERM_ID, BookingStatus.CANCELLED)).thenReturn(true);
+        when(bookingRepository.existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+                FAMILY_MEMBER_ID,
+                EVENT_TERM_ID,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.WAITLISTED))).thenReturn(true);
 
         assertThatThrownBy(() -> bookingCommandService.createBooking(FAMILY_MEMBER_ID, EVENT_TERM_ID))
                 .isInstanceOf(IllegalStateException.class);
@@ -306,5 +500,99 @@ class BookingCommandServiceUnitTest {
 
         verify(bookingRepository, never()).save(any());
         verify(bookingEventProducer, never()).publishWaitlistPromoted(any());
+    }
+
+    // ── cancelAllBookings – saga stamp ────────────────────────────────────────
+
+    @Test
+    void cancelAllBookings_stampsSagaFieldsBeforeCancelling() {
+        Booking confirmed = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CONFIRMED,
+                LocalDateTime.now());
+        Booking waitlisted = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.WAITLISTED,
+                LocalDateTime.now().minusMinutes(5));
+
+        when(bookingRepository.findByEventTermId(EVENT_TERM_ID))
+                .thenReturn(List.of(confirmed, waitlisted));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.cancelAllBookings(EVENT_TERM_ID);
+
+        assertThat(confirmed.isSagaCancelled()).isTrue();
+        assertThat(confirmed.getSagaCancelledOriginalStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(confirmed.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+
+        assertThat(waitlisted.isSagaCancelled()).isTrue();
+        assertThat(waitlisted.getSagaCancelledOriginalStatus()).isEqualTo(BookingStatus.WAITLISTED);
+        assertThat(waitlisted.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelAllBookings_alreadyCancelledBookingsAreSkipped() {
+        Booking alreadyCancelled = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED,
+                LocalDateTime.now());
+
+        when(bookingRepository.findByEventTermId(EVENT_TERM_ID))
+                .thenReturn(List.of(alreadyCancelled));
+
+        bookingCommandService.cancelAllBookings(EVENT_TERM_ID);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingCancelled(any());
+    }
+
+    // ── restoreAllBookingsForTerm – saga rollback ─────────────────────────────
+
+    @Test
+    void restoreAllBookingsForTerm_restoresEachBookingToOriginalStatus() {
+        UUID orgId = UUID.randomUUID();
+        Booking b1 = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b1.setSagaCancelled(true);
+        b1.setSagaCancelledOriginalStatus(BookingStatus.CONFIRMED);
+
+        Booking b2 = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b2.setSagaCancelled(true);
+        b2.setSagaCancelledOriginalStatus(BookingStatus.WAITLISTED);
+
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of(b1, b2));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        assertThat(b1.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(b1.isSagaCancelled()).isFalse();
+        assertThat(b1.getSagaCancelledOriginalStatus()).isNull();
+
+        assertThat(b2.getStatus()).isEqualTo(BookingStatus.WAITLISTED);
+        assertThat(b2.isSagaCancelled()).isFalse();
+        assertThat(b2.getSagaCancelledOriginalStatus()).isNull();
+    }
+
+    @Test
+    void restoreAllBookingsForTerm_publishesBookingRestoredPerBooking() {
+        UUID orgId = UUID.randomUUID();
+        Booking b = booking(UUID.randomUUID(), FAMILY_MEMBER_ID, BookingStatus.CANCELLED, LocalDateTime.now());
+        b.setSagaCancelled(true);
+        b.setSagaCancelledOriginalStatus(BookingStatus.CONFIRMED);
+
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of(b));
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0, Booking.class));
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        verify(bookingEventProducer).publishBookingRestored(any(BookingRestoredPayload.class));
+    }
+
+    @Test
+    void restoreAllBookingsForTerm_whenNoSagaBookings_doesNothing() {
+        UUID orgId = UUID.randomUUID();
+        when(bookingRepository.findByEventTermIdAndSagaCancelledTrue(EVENT_TERM_ID))
+                .thenReturn(List.of());
+
+        bookingCommandService.restoreAllBookingsForTerm(EVENT_TERM_ID, orgId);
+
+        verify(bookingRepository, never()).save(any());
+        verify(bookingEventProducer, never()).publishBookingRestored(any());
     }
 }

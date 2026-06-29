@@ -36,7 +36,8 @@ server:
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:holidayplanner-super-secret-key-that-is-at-least-256-bits-long}
-  expiration-ms: 86400000  # 24 hours
+  expiration-ms: 86400000         # 24 hours — access token TTL
+  refresh-expiration-ms: 604800000  # 7 days  — refresh token TTL
 
 # Inter-service communication URLs
 services:

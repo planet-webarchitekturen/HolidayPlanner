@@ -5,6 +5,7 @@ import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.shared.kafka.KafkaEnvelope;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
 import com.holidayplanner.shared.kafka.payload.EventTermCancelledPayload;
+import com.holidayplanner.shared.kafka.payload.EventTermRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.ParticipantListRequestedPayload;
 import com.holidayplanner.shared.kafka.payload.ParticipantMessageRequestedPayload;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 public class EventTermEventProducer implements EventTermEventPublisher {
 
     public static final String TOPIC_TERM_CANCELLED = "holiday-planner.event.term-cancelled";
+    public static final String TOPIC_TERM_RESTORED = "holiday-planner.event.term-restored";
     public static final String TOPIC_PARTICIPANT_LIST = "holiday-planner.event.participant-list-requested";
     public static final String TOPIC_PARTICIPANT_MESSAGE = "holiday-planner.event.participant-message-requested";
     public static final String TOPIC_CAPACITY_INCREASED = "holiday-planner.event.capacity-increased";
@@ -84,6 +86,21 @@ public class EventTermEventProducer implements EventTermEventPublisher {
                     payload.getEventTermId().toString(), json);
         } catch (Exception e) {
             log.error("Failed to publish ParticipantMessageRequested event", e);
+        }
+    }
+
+    @Override
+    public void publishEventTermRestored(EventTermRestoredPayload payload) {
+        try {
+            KafkaEnvelope<EventTermRestoredPayload> envelope = new KafkaEnvelope<>(
+                    "EventTermRestored", "1",
+                    LocalDateTime.now().toString(),
+                    "event-service", payload);
+            String json = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send(TOPIC_TERM_RESTORED,
+                    payload.getEventTermId().toString(), json);
+        } catch (Exception e) {
+            log.error("Failed to publish EventTermRestored event", e);
         }
     }
 }

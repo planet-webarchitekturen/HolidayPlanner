@@ -2,9 +2,12 @@ package com.holidayplanner.bookingservice.integration;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
 import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.command.BookingCommandService;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.BookingNotFoundException;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
@@ -19,6 +22,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -49,16 +54,20 @@ class BookingServiceIntegrationTest {
     private IdentityServiceClient identityServiceClient;
 
     @MockBean
-    private com.holidayplanner.bookingservice.client.OrganizationServiceClient organizationServiceClient;
+    private OrganizationServiceClient organizationServiceClient;
 
     @MockBean
     private BookingEventProducer bookingEventProducer;
 
     private static final UUID EVENT_TERM_ID = UUID.randomUUID();
+    private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         bookingRepository.deleteAll();
+        when(identityServiceClient.getFamilyMember(any())).thenAnswer(inv ->
+                familyMember(inv.getArgument(0, UUID.class)));
+        when(organizationServiceClient.getOrganization(any())).thenReturn(openOrganization());
     }
 
     private EventTermDetailResponse activeEventTerm(int maxParticipants) {
@@ -66,7 +75,25 @@ class BookingServiceIntegrationTest {
         d.setId(EVENT_TERM_ID);
         d.setStatus("ACTIVE");
         d.setMaxParticipants(maxParticipants);
+        d.setOrganizationId(ORGANIZATION_ID);
+        d.setStartDateTime(LocalDateTime.now().plusDays(14));
+        d.setMinimalAge(6);
+        d.setMaximalAge(16);
         return d;
+    }
+
+    private FamilyMemberResponse familyMember(UUID id) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(id);
+        r.setBirthDate(LocalDate.now().minusYears(10));
+        return r;
+    }
+
+    private OrganizationResponse openOrganization() {
+        OrganizationResponse r = new OrganizationResponse();
+        r.setId(ORGANIZATION_ID);
+        r.setBookingStartTime(LocalDateTime.now().minusDays(1));
+        return r;
     }
 
     // ── createBooking – full flow with real persistence ───────────────────────
@@ -140,16 +167,16 @@ class BookingServiceIntegrationTest {
     }
 
     @Test
-    void createBooking_whenEventServiceReturnsPartialResponse_stillPersists() {
-        // EventService returns a response with only the required fields; optional fields are null.
+    void createBooking_whenEventServiceReturnsMissingValidationData_throwsAndNothingPersisted() {
         EventTermDetailResponse partial = new EventTermDetailResponse();
         partial.setStatus("ACTIVE");
         partial.setMaxParticipants(5);
         when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(partial);
 
-        BookingResponse result = bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID);
+        assertThatThrownBy(() -> bookingCommandService.createBooking(UUID.randomUUID(), EVENT_TERM_ID))
+                .isInstanceOf(IllegalStateException.class);
 
-        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(bookingRepository.count()).isZero();
     }
 
     // ── cancelBooking – real DB promotion ────────────────────────────────────

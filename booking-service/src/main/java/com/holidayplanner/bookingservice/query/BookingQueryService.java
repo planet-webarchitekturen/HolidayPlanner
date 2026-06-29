@@ -2,6 +2,7 @@ package com.holidayplanner.bookingservice.query;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
 import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.dto.ActiveBookingCheckResponse;
 import com.holidayplanner.bookingservice.dto.BookingDetailResponse;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
@@ -26,6 +27,10 @@ public class BookingQueryService {
     private final EventServiceClient eventServiceClient;
     private final IdentityServiceClient identityServiceClient;
 
+    private static final List<BookingStatus> ACTIVE_BOOKING_STATUSES = List.of(
+            BookingStatus.CONFIRMED,
+            BookingStatus.WAITLISTED);
+
     public List<BookingResponse> getBookingsForEventTerm(UUID eventTermId) {
         return bookingRepository.findByEventTermId(eventTermId).stream()
                 .map(BookingResponse::from)
@@ -48,9 +53,14 @@ public class BookingQueryService {
                 .collect(Collectors.toList());
     }
 
-    /** True if the member has any active (non-CANCELLED) booking — used by the identity removal veto. */
+    public ActiveBookingCheckResponse getActiveBookingCheck(UUID familyMemberId) {
+        long activeBookingCount = bookingRepository.countByFamilyMemberIdAndStatusIn(
+                familyMemberId, ACTIVE_BOOKING_STATUSES);
+        return new ActiveBookingCheckResponse(activeBookingCount > 0, activeBookingCount);
+    }
+
     public boolean hasActiveBookings(UUID familyMemberId) {
-        return !bookingRepository.findActiveBookingsByFamilyMember(familyMemberId).isEmpty();
+        return getActiveBookingCheck(familyMemberId).isHasActiveBookings();
     }
 
     public List<BookingDetailResponse> getBookingsForFamilyMemberEnriched(UUID familyMemberId) {
@@ -93,7 +103,6 @@ public class BookingQueryService {
     }
 
     public List<String> getParticipantParentEmails(UUID eventTermId) {
-        List<Booking> a = bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED);
         return bookingRepository.findByEventTermIdAndStatus(eventTermId, BookingStatus.CONFIRMED).stream()
                 .map(b -> identityServiceClient.getOwnerEmail(b.getFamilyMemberId()))
                 .filter(email -> email != null)

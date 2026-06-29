@@ -14,6 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class EventTermDetailResponse {
     private UUID id;
+    private UUID eventId;
     private String eventName;
     private String eventLocation;
     private String meetingPoint;
@@ -22,8 +23,8 @@ public class EventTermDetailResponse {
     private LocalDateTime startDateTime;
     private LocalDateTime endDateTime;
     private int maxParticipants;
-    private int minimalAge;
-    private int maximalAge;
+    private Integer minimalAge;
+    private Integer maximalAge;
     private String status;
     private UUID organizationId;
 }

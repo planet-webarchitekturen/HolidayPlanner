@@ -1,64 +1,41 @@
 package com.holidayplanner.bookingservice.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.holidayplanner.shared.kafka.KafkaEnvelope;
+import com.holidayplanner.bookingservice.outbox.OutboxService;
 import com.holidayplanner.shared.kafka.payload.BookingCancelledPayload;
 import com.holidayplanner.shared.kafka.payload.BookingCreatedPayload;
+import com.holidayplanner.shared.kafka.payload.BookingRestoredPayload;
 import com.holidayplanner.shared.kafka.payload.WaitlistPromotedPayload;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingEventProducer {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private static final String TOPIC_BOOKING_CREATED = "holiday-planner.booking.created";
+    private static final String TOPIC_BOOKING_CANCELLED = "holiday-planner.booking.cancelled";
+    private static final String TOPIC_BOOKING_RESTORED = "holiday-planner.booking.restored";
+    private static final String TOPIC_WAITLIST_PROMOTED = "holiday-planner.booking.waitlist-promoted";
+
+    private final OutboxService outboxService;
 
     public void publishBookingCreated(BookingCreatedPayload payload) {
-        try {
-            KafkaEnvelope<BookingCreatedPayload> envelope = new KafkaEnvelope<>(
-                    "BookingCreated", "1",
-                    LocalDateTime.now().toString(),
-                    "booking-service", payload);
-            String json = objectMapper.writeValueAsString(envelope);
-            kafkaTemplate.send("holiday-planner.booking.created",
-                    payload.getBookingId().toString(), json);
-        } catch (Exception e) {
-            log.error("Failed to publish BookingCreated event", e);
-        }
+        outboxService.record("Booking", payload.getBookingId().toString(),
+                "BookingCreated", TOPIC_BOOKING_CREATED, payload);
     }
 
     public void publishBookingCancelled(BookingCancelledPayload payload) {
-        try {
-            KafkaEnvelope<BookingCancelledPayload> envelope = new KafkaEnvelope<>(
-                    "BookingCancelled", "1",
-                    LocalDateTime.now().toString(),
-                    "booking-service", payload);
-            String json = objectMapper.writeValueAsString(envelope);
-            kafkaTemplate.send("holiday-planner.booking.cancelled",
-                    payload.getBookingId().toString(), json);
-        } catch (Exception e) {
-            log.error("Failed to publish BookingCancelled event", e);
-        }
+        outboxService.record("Booking", payload.getBookingId().toString(),
+                "BookingCancelled", TOPIC_BOOKING_CANCELLED, payload);
+    }
+
+    public void publishBookingRestored(BookingRestoredPayload payload) {
+        outboxService.record("Booking", payload.getBookingId().toString(),
+                "BookingRestored", TOPIC_BOOKING_RESTORED, payload);
     }
 
     public void publishWaitlistPromoted(WaitlistPromotedPayload payload) {
-        try {
-            KafkaEnvelope<WaitlistPromotedPayload> envelope = new KafkaEnvelope<>(
-                    "WaitlistPromoted", "1",
-                    LocalDateTime.now().toString(),
-                    "booking-service", payload);
-            String json = objectMapper.writeValueAsString(envelope);
-            kafkaTemplate.send("holiday-planner.booking.waitlist-promoted",
-                    payload.getBookingId().toString(), json);
-        } catch (Exception e) {
-            log.error("Failed to publish WaitlistPromoted event", e);
-        }
+        outboxService.record("Booking", payload.getBookingId().toString(),
+                "WaitlistPromoted", TOPIC_WAITLIST_PROMOTED, payload);
     }
 }

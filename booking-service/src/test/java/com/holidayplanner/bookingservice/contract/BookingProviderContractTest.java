@@ -1,11 +1,17 @@
 package com.holidayplanner.bookingservice.contract;
 
 import com.holidayplanner.bookingservice.client.EventServiceClient;
+import com.holidayplanner.bookingservice.client.IdentityServiceClient;
+import com.holidayplanner.bookingservice.client.OrganizationServiceClient;
 import com.holidayplanner.bookingservice.dto.EventTermDetailResponse;
+import com.holidayplanner.bookingservice.dto.FamilyMemberResponse;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
 import com.holidayplanner.bookingservice.exception.EventServiceException;
 import com.holidayplanner.bookingservice.exception.EventTermNotFoundException;
 import com.holidayplanner.bookingservice.repository.BookingRepository;
 import com.holidayplanner.bookingservice.support.TestJwt;
+import com.holidayplanner.shared.model.Booking;
+import com.holidayplanner.shared.model.BookingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +25,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -50,13 +58,23 @@ class BookingProviderContractTest {
     @MockBean
     private EventServiceClient eventServiceClient;
 
+    @MockBean
+    private IdentityServiceClient identityServiceClient;
+
+    @MockBean
+    private OrganizationServiceClient organizationServiceClient;
+
     private static final UUID FAMILY_MEMBER_ID = UUID.randomUUID();
     private static final UUID EVENT_TERM_ID     = UUID.randomUUID();
+    private static final UUID ORGANIZATION_ID = UUID.randomUUID();
     private static final String USER_BEARER = "Bearer " + TestJwt.token("USER");
 
     @BeforeEach
     void setUp() {
         bookingRepository.deleteAll();
+        when(identityServiceClient.getFamilyMember(any())).thenAnswer(inv ->
+                familyMember(inv.getArgument(0, UUID.class)));
+        when(organizationServiceClient.getOrganization(any())).thenReturn(openOrganization());
     }
 
     /** Performs the request with a USER JWT so it passes the security filter + @PreAuthorize checks. */
@@ -64,14 +82,36 @@ class BookingProviderContractTest {
         return mockMvc.perform(builder.header(HttpHeaders.AUTHORIZATION, USER_BEARER));
     }
 
+    private EventTermDetailResponse activeEventTerm(int maxParticipants) {
+        EventTermDetailResponse term = new EventTermDetailResponse();
+        term.setStatus("ACTIVE");
+        term.setMaxParticipants(maxParticipants);
+        term.setOrganizationId(ORGANIZATION_ID);
+        term.setStartDateTime(LocalDateTime.now().plusDays(14));
+        term.setMinimalAge(6);
+        term.setMaximalAge(16);
+        return term;
+    }
+
+    private FamilyMemberResponse familyMember(UUID id) {
+        FamilyMemberResponse r = new FamilyMemberResponse();
+        r.setId(id);
+        r.setBirthDate(LocalDate.now().minusYears(10));
+        return r;
+    }
+
+    private OrganizationResponse openOrganization() {
+        OrganizationResponse r = new OrganizationResponse();
+        r.setId(ORGANIZATION_ID);
+        r.setBookingStartTime(LocalDateTime.now().minusDays(1));
+        return r;
+    }
+
     // ── Contract: POST /api/bookings → 200 Booking ───────────────────────────
 
     @Test
     void contract_createBooking_responseShape() throws Exception {
-        EventTermDetailResponse term = new EventTermDetailResponse();
-        term.setStatus("ACTIVE");
-        term.setMaxParticipants(10);
-        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(term);
+        when(eventServiceClient.getEventTerm(EVENT_TERM_ID)).thenReturn(activeEventTerm(10));
 
         send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
@@ -90,10 +130,7 @@ class BookingProviderContractTest {
 
     @Test
     void contract_createBooking_statusIsConfirmedOrWaitlisted() throws Exception {
-        EventTermDetailResponse term = new EventTermDetailResponse();
-        term.setStatus("ACTIVE");
-        term.setMaxParticipants(10);
-        when(eventServiceClient.getEventTerm(any())).thenReturn(term);
+        when(eventServiceClient.getEventTerm(any())).thenReturn(activeEventTerm(10));
 
         // First booking must be CONFIRMED when capacity allows
         send(post("/api/bookings")
@@ -102,10 +139,7 @@ class BookingProviderContractTest {
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         // Fill capacity then the next must be WAITLISTED
-        EventTermDetailResponse full = new EventTermDetailResponse();
-        full.setStatus("ACTIVE");
-        full.setMaxParticipants(0); // force waitlist
-        when(eventServiceClient.getEventTerm(any())).thenReturn(full);
+        when(eventServiceClient.getEventTerm(any())).thenReturn(activeEventTerm(0));
 
         UUID other = UUID.randomUUID();
         send(post("/api/bookings")
@@ -118,10 +152,7 @@ class BookingProviderContractTest {
 
     @Test
     void contract_cancelBooking_responseShape() throws Exception {
-        EventTermDetailResponse term = new EventTermDetailResponse();
-        term.setStatus("ACTIVE");
-        term.setMaxParticipants(10);
-        when(eventServiceClient.getEventTerm(any())).thenReturn(term);
+        when(eventServiceClient.getEventTerm(any())).thenReturn(activeEventTerm(10));
 
         String created = send(post("/api/bookings")
                         .param("familyMemberId", FAMILY_MEMBER_ID.toString())
@@ -138,6 +169,22 @@ class BookingProviderContractTest {
     }
 
     // ── Contract: error responses ─────────────────────────────────────────────
+
+    @Test
+    void contract_hasActiveBookings_responseShape() throws Exception {
+        Booking booking = new Booking();
+        booking.setFamilyMemberId(FAMILY_MEMBER_ID);
+        booking.setEventTermId(EVENT_TERM_ID);
+        booking.setStatus(BookingStatus.WAITLISTED);
+        bookingRepository.save(booking);
+
+        send(get("/api/bookings/family-member/" + FAMILY_MEMBER_ID + "/has-active"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(jsonPath("$.hasActiveBookings").value(true))
+                .andExpect(jsonPath("$.activeBookingCount").value(1))
+                .andExpect(jsonPath("$.error").doesNotExist());
+    }
 
     @Test
     void contract_404ErrorShape_whenEventTermNotFound() throws Exception {

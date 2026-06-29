@@ -109,6 +109,8 @@ class EventProviderContractTest {
                 .andExpect(jsonPath("$.maxParticipants").exists())
                 .andExpect(jsonPath("$.status").exists())
                 .andExpect(jsonPath("$.eventName").exists())
-                .andExpect(jsonPath("$.startDateTime").exists());
+                .andExpect(jsonPath("$.startDateTime").exists())
+                .andExpect(jsonPath("$.minimalAge").value(6))
+                .andExpect(jsonPath("$.maximalAge").value(12));
     }
 }

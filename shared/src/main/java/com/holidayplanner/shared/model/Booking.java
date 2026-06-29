@@ -34,6 +34,14 @@ public class Booking {
     @Column(nullable = false)
     private LocalDateTime bookedAt;
 
+    /** True when cancelled by the organization-deletion saga so the booking can be identified for restoration. */
+    @Column(nullable = false)
+    private boolean sagaCancelled = false;
+
+    /** Status before the saga cancelled this booking; used to restore it exactly. */
+    @Enumerated(EnumType.STRING)
+    private BookingStatus sagaCancelledOriginalStatus;
+
     @PrePersist
     public void prePersist() {
         this.bookedAt = LocalDateTime.now();

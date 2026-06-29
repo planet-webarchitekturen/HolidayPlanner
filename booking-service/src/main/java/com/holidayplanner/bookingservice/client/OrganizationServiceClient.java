@@ -1,15 +1,16 @@
 package com.holidayplanner.bookingservice.client;
 
-import com.holidayplanner.bookingservice.dto.OrganizationDto;
-import lombok.extern.slf4j.Slf4j;
+import com.holidayplanner.bookingservice.dto.OrganizationResponse;
+import com.holidayplanner.bookingservice.exception.OrganizationServiceException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.UUID;
 
-/** HTTP client for reading organization data (e.g. bookingStartTime) from organization-service. */
-@Slf4j
 @Component
 public class OrganizationServiceClient {
 
@@ -26,20 +27,26 @@ public class OrganizationServiceClient {
         this.serviceSecret = serviceSecret;
     }
 
-    /** Fetch an organization, or null if it cannot be resolved (booking window check then skipped). */
-    public OrganizationDto getOrganization(UUID organizationId) {
-        if (organizationId == null) {
-            return null;
-        }
+    public OrganizationResponse getOrganization(UUID organizationId) {
+        String url = organizationServiceUrl + "/api/organizations/" + organizationId;
         try {
             return restClient.get()
-                    .uri(organizationServiceUrl + "/api/organizations/" + organizationId)
+                    .uri(url)
                     .header("X-Service-Secret", serviceSecret)
                     .retrieve()
-                    .body(OrganizationDto.class);
-        } catch (Exception e) {
-            log.warn("Could not fetch organization {}: {}", organizationId, e.getMessage());
-            return null;
+                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                        throw new IllegalStateException("Organization not found: " + organizationId);
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new OrganizationServiceException("Organization service returned server error", null);
+                    })
+                    .body(OrganizationResponse.class);
+        } catch (IllegalStateException | OrganizationServiceException e) {
+            throw e;
+        } catch (ResourceAccessException e) {
+            throw new OrganizationServiceException("Organization service unavailable", e);
+        } catch (RestClientException e) {
+            throw new OrganizationServiceException("Organization service error: " + e.getMessage(), e);
         }
     }
 }

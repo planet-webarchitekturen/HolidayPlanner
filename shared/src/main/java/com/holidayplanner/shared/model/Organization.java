@@ -30,6 +30,10 @@ public class Organization {
     // From when participants can book events
     private LocalDateTime bookingStartTime;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrganizationStatus status = OrganizationStatus.ACTIVE;
+
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TeamMember> teamMembers = new ArrayList<>();
 

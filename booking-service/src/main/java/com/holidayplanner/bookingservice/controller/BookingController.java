@@ -1,6 +1,7 @@
 package com.holidayplanner.bookingservice.controller;
 
 import com.holidayplanner.bookingservice.command.BookingCommandService;
+import com.holidayplanner.bookingservice.dto.ActiveBookingCheckResponse;
 import com.holidayplanner.bookingservice.dto.BookingDetailResponse;
 import com.holidayplanner.bookingservice.dto.BookingResponse;
 import com.holidayplanner.bookingservice.dto.EventTermSummaryResponse;
@@ -43,18 +44,15 @@ public class BookingController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
         }
-
     }
 
     @GetMapping("/event-term/{eventTermId}/participant-names")
     public ResponseEntity<List<String>> getParticipantDisplayNames(@PathVariable("eventTermId") UUID eventTermId) {
-        try
-{
+        try {
             return ResponseEntity.ok(bookingQueryService.getParticipantDisplayNames(eventTermId));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
         }
-
     }
 
     @GetMapping("/event-term/{eventTermId}/summary")
@@ -67,10 +65,10 @@ public class BookingController {
         return ResponseEntity.ok(bookingQueryService.getBookingsForFamilyMember(familyMemberId));
     }
 
-    /** Veto support for identity-service: true if the member has any CONFIRMED/WAITLISTED booking. */
     @GetMapping("/family-member/{familyMemberId}/has-active")
-    public ResponseEntity<Boolean> hasActiveBookings(@PathVariable("familyMemberId") UUID familyMemberId) {
-        return ResponseEntity.ok(bookingQueryService.hasActiveBookings(familyMemberId));
+    public ResponseEntity<ActiveBookingCheckResponse> hasActiveBookingsForFamilyMember(
+            @PathVariable("familyMemberId") UUID familyMemberId) {
+        return ResponseEntity.ok(bookingQueryService.getActiveBookingCheck(familyMemberId));
     }
 
     @GetMapping("/family-member/{familyMemberId}/details")

@@ -69,4 +69,14 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
+    public UUID getUserIdFromToken(String token) {
+        Claims claims = parseClaims(token);
+        return UUID.fromString(claims.getSubject());
+    }
+
+    public UUID getOrganizationIdFromToken(String token) {
+        Claims claims = parseClaims(token);
+        return UUID.fromString(claims.get("organizationId", String.class));
+    }
+
 }

@@ -44,7 +44,8 @@ public class BookingCancelledConsumer {
                                     payment.getAmount()));
                     log.info("Refunded payment {} for cancelled booking {}", payment.getId(), payload.getBookingId());
                 } else if (payment.getStatus() == PaymentStatus.PENDING) {
-                    payment.setStatus(PaymentStatus.REFUNDED);
+                    // PENDING means no money was exchanged — cancel without a refund event.
+                    payment.setStatus(PaymentStatus.VOIDED);
                     paymentRepository.save(payment);
                     log.info("Voided pending payment {} for booking {}", payment.getId(), payload.getBookingId());
                 }

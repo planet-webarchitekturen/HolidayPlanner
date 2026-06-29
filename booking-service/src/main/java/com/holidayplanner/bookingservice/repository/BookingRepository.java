@@ -7,26 +7,33 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
-    // SpringData JPA generates the implementation based on method names
     List<Booking> findByEventTermId(UUID eventTermId);
 
     List<Booking> findByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);
 
-    // FIFO waitlist order: oldest booking is promoted first.
     List<Booking> findByEventTermIdAndStatusOrderByBookedAtAsc(UUID eventTermId, BookingStatus status);
 
     List<Booking> findByFamilyMemberId(UUID familyMemberId);
 
     long countByEventTermIdAndStatus(UUID eventTermId, BookingStatus status);
 
+    long countByFamilyMemberIdAndStatusIn(UUID familyMemberId, Collection<BookingStatus> statuses);
+
+    boolean existsByFamilyMemberIdAndEventTermIdAndStatusIn(
+            UUID familyMemberId,
+            UUID eventTermId,
+            Collection<BookingStatus> statuses);
+
     @Query("SELECT b FROM Booking b WHERE b.familyMemberId = :familyMemberId AND b.status != 'CANCELLED' ORDER BY b.bookedAt DESC")
     List<Booking> findActiveBookingsByFamilyMember(@Param("familyMemberId") UUID familyMemberId);
 
-    // Duplicate-booking guard: an existing non-CANCELLED booking for the same member+term.
+    List<Booking> findByEventTermIdAndSagaCancelledTrue(UUID eventTermId);
+
     boolean existsByFamilyMemberIdAndEventTermIdAndStatusNot(UUID familyMemberId, UUID eventTermId, BookingStatus status);
 }
