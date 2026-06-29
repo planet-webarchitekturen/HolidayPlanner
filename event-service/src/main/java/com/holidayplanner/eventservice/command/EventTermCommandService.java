@@ -9,11 +9,11 @@ import com.holidayplanner.eventservice.dto.CreateEventTermRequest;
 import com.holidayplanner.eventservice.dto.EventTermResponse;
 import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
-import com.holidayplanner.eventservice.port.NotificationPort;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
 import com.holidayplanner.eventservice.saga.EventTermCancellationSaga;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
+import com.holidayplanner.shared.kafka.payload.ParticipantMessageRequestedPayload;
 import com.holidayplanner.shared.model.Event;
 import com.holidayplanner.shared.model.EventTerm;
 import com.holidayplanner.shared.model.EventTermStatus;
@@ -35,7 +35,6 @@ public class EventTermCommandService {
     private final EventRepository eventRepository;
     private final EventTermEventPublisher eventTermEventPublisher;
     private final BookingServicePort bookingServicePort;
-    private final NotificationPort notificationPort;
     private final EventTermCancellationSaga eventTermCancellationSaga;
 
     public EventTermResponse createEventTerm(UUID eventId, CreateEventTermRequest request) {
@@ -119,6 +118,7 @@ public class EventTermCommandService {
         String resolvedSubject = subject != null && !subject.isBlank()
                 ? subject
                 : "Message regarding: " + (term.getEvent() != null ? term.getEvent().getShortTitle() : "your event");
-        notificationPort.sendBulkEmail(emails, resolvedSubject, messageBody);
+        eventTermEventPublisher.publishParticipantMessageRequested(
+                new ParticipantMessageRequestedPayload(eventTermId, emails, resolvedSubject, messageBody));
     }
 }

@@ -57,5 +57,4 @@ eventTermId    = 55555555-5555-5555-5555-555555555555
 9. [Manual Payment Operations](./08-manual-payment-operations.md)
 10. [Notification Service Direct Calls](./09-notification-direct-calls.md)
 11. [Booklet PDF Generation](./10-booklet-generation.md)
-12. [Booklet Request Workflow](./11-booklet-request-workflow.md)
-13. [Troubleshooting](./99-troubleshooting.md)
+12. [Troubleshooting](./99-troubleshooting.md)

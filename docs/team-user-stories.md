@@ -305,7 +305,6 @@ If implementing the documented saga:
 | Unused request DTOs                      | identity, organization, payment, booking | Controllers use `@RequestParam`; either adopt the DTOs or delete them                                                 |
 | Generic `RuntimeException`s              | organization, identity                   | Replace with domain exceptions + `GlobalExceptionHandler` mappings                                                    |
 | No coverage tooling                      | parent pom                               | Add JaCoCo to the parent `pom.xml`                                                                                    |
-| booklet-request-service                  | standalone                               | In-memory only, no security, no tests — decide whether it stays a CQRS demo or gets persisted                         |
 
 
 ---
@@ -393,7 +392,6 @@ Second run: Postgres **up** on `localhost:5433` → identity, organization, paym
 | shared                  | PASS                   | —     | —      | —            |
 | booking-service         | **FAIL**               | 57    | 16     | 41           |
 | booklet-service         | PASS                   | 1     | 1      | 0            |
-| booklet-request-service | PASS (no tests)        | 0     | 0      | 0            |
 | event-service           | **FAIL**               | 16    | 12     | 4            |
 | identity-service        | PASS *(with Postgres)* | 1     | 1      | 0            |
 | notification-service    | PASS                   | 7     | 7      | 0            |
@@ -439,5 +437,4 @@ Second run: Postgres **up** on `localhost:5433` → identity, organization, paym
 | Muhi, Tarik   | 5 (Capacity consumer) + 4 (Scheduler tests) — Kafka-focused                         |
 | Fabian, Aleks | 6 (PDF notification) + 10 (Email delivery) — notification/booklet pair              |
 | Büsra, Denise | 9 (Auth/JWT) + 8 (Delete-org saga decision)                                         |
-
 

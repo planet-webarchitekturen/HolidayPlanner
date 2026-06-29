@@ -6,11 +6,11 @@ import com.holidayplanner.eventservice.domain.exception.EventTermNotActiveExcept
 import com.holidayplanner.eventservice.domain.exception.InvalidStatusTransitionException;
 import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
-import com.holidayplanner.eventservice.port.NotificationPort;
 import com.holidayplanner.eventservice.repository.EventRepository;
 import com.holidayplanner.eventservice.repository.EventTermRepository;
 import com.holidayplanner.eventservice.saga.EventTermCancellationSaga;
 import com.holidayplanner.shared.kafka.payload.CapacityIncreasedPayload;
+import com.holidayplanner.shared.kafka.payload.ParticipantMessageRequestedPayload;
 import com.holidayplanner.shared.model.Event;
 import com.holidayplanner.shared.model.EventTerm;
 import com.holidayplanner.shared.model.EventTermStatus;
@@ -43,8 +43,6 @@ class EventTermCommandServiceUnitTest {
     private EventTermEventPublisher eventTermEventPublisher;
     @Mock
     private BookingServicePort bookingServicePort;
-    @Mock
-    private NotificationPort notificationPort;
     @Mock
     private EventTermCancellationSaga eventTermCancellationSaga;
 
@@ -129,14 +127,20 @@ class EventTermCommandServiceUnitTest {
     }
 
     @Test
-    void sendMessage_whenActive_callsNotification() {
+    void sendMessage_whenActive_publishesParticipantMessageRequested() {
         term.setStatus(EventTermStatus.ACTIVE);
         when(eventTermRepository.findByIdWithEvent(termId)).thenReturn(Optional.of(term));
         when(bookingServicePort.getParticipantParentEmails(termId)).thenReturn(List.of("p@example.com"));
 
         commandService.sendMessageToParticipants(termId, "Subject", "Hello");
 
-        verify(notificationPort).sendBulkEmail(List.of("p@example.com"), "Subject", "Hello");
+        ArgumentCaptor<ParticipantMessageRequestedPayload> payload =
+                ArgumentCaptor.forClass(ParticipantMessageRequestedPayload.class);
+        verify(eventTermEventPublisher).publishParticipantMessageRequested(payload.capture());
+        assertThat(payload.getValue().getEventTermId()).isEqualTo(termId);
+        assertThat(payload.getValue().getRecipients()).containsExactly("p@example.com");
+        assertThat(payload.getValue().getSubject()).isEqualTo("Subject");
+        assertThat(payload.getValue().getBody()).isEqualTo("Hello");
     }
 
     // ── saga cancellation stamp ───────────────────────────────────────────────

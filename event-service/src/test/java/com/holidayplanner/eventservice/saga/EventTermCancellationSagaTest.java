@@ -2,7 +2,7 @@ package com.holidayplanner.eventservice.saga;
 
 import com.holidayplanner.eventservice.command.CancellationActor;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
-import com.holidayplanner.eventservice.repository.CaregiverRepository;
+import com.holidayplanner.eventservice.port.IdentityServicePort;
 import com.holidayplanner.shared.kafka.payload.EventTermCancelledPayload;
 import com.holidayplanner.shared.model.Caregiver;
 import com.holidayplanner.shared.model.Event;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 class EventTermCancellationSagaTest {
 
     @Mock
-    private CaregiverRepository caregiverRepository;
+    private IdentityServicePort identityServicePort;
     @Mock
     private EventTermEventPublisher eventTermEventPublisher;
 
@@ -46,7 +46,7 @@ class EventTermCancellationSagaTest {
         term.getCaregiverIds().add(caregiverId);
         Caregiver caregiver = new Caregiver();
         caregiver.setEmail("caregiver@example.com");
-        when(caregiverRepository.findById(caregiverId)).thenReturn(Optional.of(caregiver));
+        when(identityServicePort.findCaregiverById(caregiverId)).thenReturn(Optional.of(caregiver));
 
         saga.start(term, CancellationActor.EVENT_OWNER);
 

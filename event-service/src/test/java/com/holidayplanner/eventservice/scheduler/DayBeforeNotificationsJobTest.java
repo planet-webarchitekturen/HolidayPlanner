@@ -1,6 +1,5 @@
 package com.holidayplanner.eventservice.scheduler;
 
-import com.holidayplanner.eventservice.port.BookingServicePort;
 import com.holidayplanner.eventservice.port.EventTermEventPublisher;
 import com.holidayplanner.eventservice.port.IdentityServicePort;
 import com.holidayplanner.eventservice.query.EventTermQueryService;
@@ -37,8 +36,6 @@ class DayBeforeNotificationsJobTest {
     @Mock
     private EventTermQueryService eventTermQueryService;
     @Mock
-    private BookingServicePort bookingServicePort;
-    @Mock
     private IdentityServicePort identityServicePort;
     @Mock
     private EventTermEventPublisher eventTermEventPublisher;
@@ -50,7 +47,7 @@ class DayBeforeNotificationsJobTest {
     @BeforeEach
     void setUp() {
         job = new DayBeforeNotificationsJob(
-                eventTermQueryService, bookingServicePort, identityServicePort, eventTermEventPublisher, fixedClock);
+                eventTermQueryService, identityServicePort, eventTermEventPublisher, fixedClock);
     }
 
     private EventTerm termWithCaregiver(UUID termId, UUID caregiverId, LocalDateTime start, String eventTitle) {
@@ -78,7 +75,6 @@ class DayBeforeNotificationsJobTest {
         caregiver.setEmail("caregiver@example.test");
 
         when(eventTermQueryService.findActiveTermsStartingOn(tomorrow)).thenReturn(List.of(term));
-        when(bookingServicePort.getParticipantDisplayNames(termId)).thenReturn(List.of("Anna", "Ben"));
         when(identityServicePort.findCaregiverById(caregiverId)).thenReturn(Optional.of(caregiver));
 
         job.scheduleDayBeforeNotifications();
@@ -90,7 +86,7 @@ class DayBeforeNotificationsJobTest {
         assertThat(payload.getEventTermId()).isEqualTo(termId);
         assertThat(payload.getCaregiverEmail()).isEqualTo("caregiver@example.test");
         assertThat(payload.getEventName()).isEqualTo("Bike Adventure");
-        assertThat(payload.getParticipantNames()).containsExactly("Anna", "Ben");
+        assertThat(payload.getTermDate()).isEqualTo(start.toString());
     }
 
     @Test
@@ -101,7 +97,6 @@ class DayBeforeNotificationsJobTest {
         EventTerm term = termWithCaregiver(termId, caregiverId, tomorrow.atTime(9, 0), "Bike Adventure");
 
         when(eventTermQueryService.findActiveTermsStartingOn(tomorrow)).thenReturn(List.of(term));
-        when(bookingServicePort.getParticipantDisplayNames(termId)).thenReturn(List.of("Anna"));
         when(identityServicePort.findCaregiverById(caregiverId)).thenReturn(Optional.empty());
 
         job.scheduleDayBeforeNotifications();

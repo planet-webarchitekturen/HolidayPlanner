@@ -14,8 +14,8 @@
         <module name="booklet-service" />
         <module name="payment-service" />
         <module name="event-service" />
-        <module name="booking-service" />
         <module name="booklet-request-service" />
+        <module name="booking-service" />
         <module name="organization-service" />
         <module name="identity-service" />
         <module name="notification-service" />

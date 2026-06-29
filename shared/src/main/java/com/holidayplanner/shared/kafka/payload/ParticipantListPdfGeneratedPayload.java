@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ParticipantListRequestedPayload {
+public class ParticipantListPdfGeneratedPayload {
   private UUID eventTermId;
   private String caregiverEmail;
   private String eventName;
