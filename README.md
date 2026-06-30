@@ -120,6 +120,7 @@ HolidayPlanner/
 │   ├── system-operations.md
 │   ├── messaging-conventions.md ← serialization, topic naming, envelope format
 │   └── testing-notes.md
+├── scripts/                    ← shell demos for common scenarios
 ├── shared/
 ├── identity-service/
 ├── event-service/
@@ -140,6 +141,10 @@ HolidayPlanner/
 - PostgreSQL (only if running a service outside Docker)
 
 > Use the bundled wrapper `./mvnw` (or `mvnw.cmd` on Windows) instead of a system `mvn`, so everyone builds with the same Maven (3.9.6). The build enforces JDK 21+ and Maven 3.9+ and **fails immediately with a clear message** if they're missing — no more cryptic Lombok errors.
+
+### Demo scripts
+
+The `scripts/` directory contains shell scripts that walk through common scenarios, for example bookings, waitlists, events, booklets, organization payments and story-specific flows. Start the stack first, then run one with `bash scripts/<script-name>.sh`.
 
 ### Build the full monorepo
 ```bash
