@@ -91,8 +91,6 @@ services:
     build:
       context: .
       dockerfile: booking-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/booking-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8082:8082"
@@ -120,8 +118,6 @@ services:
     build:
       context: .
       dockerfile: event-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/event-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8081:8081"
@@ -146,8 +142,6 @@ services:
     build:
       context: .
       dockerfile: identity-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/identity-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8083:8083"
@@ -171,8 +165,6 @@ services:
     build:
       context: .
       dockerfile: organization-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/organization-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8084:8084"
@@ -197,8 +189,6 @@ services:
     build:
       context: .
       dockerfile: payment-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/payment-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8085:8085"
@@ -223,8 +213,6 @@ services:
     build:
       context: .
       dockerfile: notification-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/notification-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8090:8089"
@@ -261,8 +249,6 @@ services:
     build:
       context: .
       dockerfile: booklet-service/Dockerfile
-    image: ghcr.io/planet-webarchitekturen/booklet-service:${IMAGE_TAG:-latest}
-    pull_policy: always
     <<: *default-logging
     ports:
       - "8087:8087"

@@ -27,7 +27,7 @@
     <properties>
         <java.version>21</java.version>
         <spring-boot.version>3.2.4</spring-boot.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <pdfbox.version>3.0.2</pdfbox.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -78,5 +78,34 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <!-- Fail fast with a clear message if the build is run on an unsupported
+                 JDK/Maven, instead of crashing later inside Lombok ("TypeTag :: UNKNOWN"). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-environment</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,)</version>
+                                    <message>This project requires JDK 21 or newer. Maven is running on an older JDK. Point JAVA_HOME at a JDK 21+ install and rebuild (macOS: export JAVA_HOME=$(/usr/libexec/java_home -v 21)).</message>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9,)</version>
+                                    <message>This project requires Maven 3.9 or newer. Use the bundled wrapper: ./mvnw clean install</message>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>

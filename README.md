@@ -7,12 +7,12 @@ A web application that provides a platform where municipalities can offer events
 ## Quick Start
 
 ```bash
-git clone https://github.com/MuhiGuezel/HolidayPlanner
+git clone https://github.com/planet-webarchitekturen/HolidayPlanner
 cd HolidayPlanner
-docker compose up -d
+docker compose up --build -d
 ```
 
-Wait ~60 seconds, then verify:
+The first `--build` compiles all 7 services in Docker (pinned JDK 21) and takes a few minutes — **no GitHub or registry login is required**, images are built locally from source. Later runs reuse the built images. Once the containers are healthy, verify:
 
 ```bash
 curl http://localhost:8081/api/events/health   # event-service
@@ -61,7 +61,7 @@ All members worked as **backend developers** (Java 21 / Spring Boot) on a micros
 
 ## Repository
 
-**Main Repository:** [https://github.com/MuhiGuezel/HolidayPlanner](https://github.com/MuhiGuezel/HolidayPlanner)
+**Main Repository:** [https://github.com/planet-webarchitekturen/HolidayPlanner](https://github.com/planet-webarchitekturen/HolidayPlanner)
 
 The repository is organized as a Maven multi-module monorepo on `main`. Each service is its own Spring Boot application, and the shared model classes live in the `shared` module.
 
@@ -106,7 +106,7 @@ HolidayPlanner/
 ├── create_topic.sh             ← create a Kafka topic
 ├── kcat                        ← kcat wrapper (produce/consume messages)
 ├── .github/workflows/
-│   └── publish.yml             ← builds & pushes images to GHCR on push to main
+│   └── ci.yml                  ← builds & pushes images to GHCR on push to main
 ├── docker/
 │   ├── init-databases.sh       ← creates all PostgreSQL databases
 │   ├── application-event.yml
@@ -135,31 +135,42 @@ HolidayPlanner/
 ## How to Build
 
 ### Prerequisites
-- Java 21
-- Maven 3.9+
-- Docker
-- PostgreSQL (for local development)
+- **JDK 21 or newer** — the build targets Java 21 bytecode. You do **not** need Maven installed; the repo ships a Maven wrapper.
+- Docker (for `docker compose`)
+- PostgreSQL (only if running a service outside Docker)
+
+> Use the bundled wrapper `./mvnw` (or `mvnw.cmd` on Windows) instead of a system `mvn`, so everyone builds with the same Maven (3.9.6). The build enforces JDK 21+ and Maven 3.9+ and **fails immediately with a clear message** if they're missing — no more cryptic Lombok errors.
 
 ### Build the full monorepo
 ```bash
-mvn clean install
+./mvnw clean install
 ```
 
 ### Build a single service
 ```bash
-mvn -pl <service-name> -am clean package -DskipTests
+./mvnw -pl <service-name> -am clean package -DskipTests
 ```
 
 ### Run a single service locally
 ```bash
-cd <service-name>
-mvn spring-boot:run
+./mvnw -pl <service-name> spring-boot:run
 ```
 
 ### Run tests
 ```bash
-mvn test
+./mvnw test
 ```
+
+### Troubleshooting
+- **`java.lang.ExceptionInInitializerError: ... TypeTag :: UNKNOWN` during compile** means Maven is running on a JDK its Lombok version can't handle. Check the JDK Maven actually uses:
+  ```bash
+  ./mvnw -version    # look at the "Java version:" line — it can differ from `java -version`
+  ```
+  If it's wrong, point `JAVA_HOME` at a JDK 21 install and rebuild:
+  ```bash
+  export JAVA_HOME=$(/usr/libexec/java_home -v 21)   # macOS
+  ./mvnw clean install
+  ```
 
 ---
 
@@ -168,14 +179,16 @@ mvn test
 ### Run everything locally
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-This starts: all 7 services + PostgreSQL + Kafka + Kafka UI (http://localhost:5000).
+This builds all 7 service images locally from their Dockerfiles and starts them + PostgreSQL + Kafka + Kafka UI (http://localhost:5001). No registry login is required.
 
 PostgreSQL is published on **host port 5433** (`5433:5432` in `docker-compose.yml`) so it does not clash with a local Postgres on 5432. From your machine, set `DB_PORT=5433` when connecting to the compose database; containers still use `postgres:5432` on the Docker network.
 
-Images are pulled automatically from GHCR (`ghcr.io/muhiguezel/holidayplanner-*:latest`).
+Images are built locally from each service's `Dockerfile` — no GitHub login needed. (CI separately publishes images to `ghcr.io/planet-webarchitekturen/<service>:latest` on every push to `main`; those are used by the deployment pipeline, not required for local development.)
+
+> **Troubleshooting:** if a service logs `database "<name>_db" does not exist`, the Postgres volume was created before the DB init script ran. Reset it with `docker compose down -v && docker compose up --build`.
 
 ### Build an image manually (from the repo root)
 
@@ -191,9 +204,9 @@ Images are published automatically via GitHub Actions on every push to `main`.
 To publish manually:
 
 ```bash
-echo $GITHUB_TOKEN | docker login ghcr.io -u MuhiGuezel --password-stdin
-docker build -f booking-service/Dockerfile -t ghcr.io/muhiguezel/holidayplanner-booking-service:latest .
-docker push ghcr.io/muhiguezel/holidayplanner-booking-service:latest
+echo $GITHUB_TOKEN | docker login ghcr.io -u <github-username> --password-stdin
+docker build -f booking-service/Dockerfile -t ghcr.io/planet-webarchitekturen/booking-service:latest .
+docker push ghcr.io/planet-webarchitekturen/booking-service:latest
 ```
 
 ---
@@ -225,7 +238,7 @@ Each service is configured via environment variables. Defaults are set for local
 
 ## Kafka
 
-Kafka runs on `localhost:9092`. UI at http://localhost:5000.
+Kafka runs on `localhost:9092`. UI at http://localhost:5001.
 
 **Create a topic:**
 ```bash
