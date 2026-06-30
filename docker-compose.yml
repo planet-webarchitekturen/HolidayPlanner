@@ -27,42 +27,40 @@ services:
       retries: 5
 
   kafka:
-    image: public.ecr.aws/bitnami/kafka:4.2.0
+    image: apache/kafka:4.2.0
     <<: *default-logging
     deploy:
       resources:
         limits:
           pids: 1024
     volumes:
-      - "./volumes/kafka/data:/bitnami/kafka"
+      - "./volumes/kafka/data/data:/var/lib/kafka/data"
     user: "0"
     ports:
       - "9092:9092"
     environment:
-      BITNAMI_DEBUG: true
-      KAFKA_CFG_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_KRAFT_CLUSTER_ID: '6L8XGfS3T9Wj4e1_L-5_pQ'
-      KAFKA_CFG_CONTROLLER_QUORUM_BOOTSTRAP_SERVERS: 'kafka:29093'
-      KAFKA_INITIAL_CONTROLLERS: '1@kafka:29093:6L8XGfS3T9Wj4e1_L-5_pQ'
-      KAFKA_CFG_LISTENERS: 'DOCKER://kafka:29092,CONTROLLER://kafka:29093,HOST://0.0.0.0:9092'
-      KAFKA_CFG_ADVERTISED_LISTENERS: 'DOCKER://kafka:29092,HOST://localhost:9092'
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,DOCKER:PLAINTEXT,HOST:PLAINTEXT'
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: 'DOCKER'
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-      KAFKA_CFG_COMPRESSION_TYPE: gzip
-      KAFKA_CFG_LOG_RETENTION_MS: -1
-      KAFKA_CFG_LOG_RETENTION_BYTES: -1
-      KAFKA_CFG_MESSAGE_TIMESTAMP_TYPE: CreateTime
-      KAFKA_CFG_DELETE_TOPIC_ENABLE: "true"
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: '6L8XGfS3T9Wj4e1_L-5_pQ'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'DOCKER://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,HOST://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'DOCKER://kafka:29092,HOST://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,DOCKER:PLAINTEXT,HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'DOCKER'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_COMPRESSION_TYPE: gzip
+      KAFKA_LOG_RETENTION_MS: -1
+      KAFKA_LOG_RETENTION_BYTES: -1
+      KAFKA_MESSAGE_TIMESTAMP_TYPE: CreateTime
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 10s
       timeout: 10s
       retries: 10
